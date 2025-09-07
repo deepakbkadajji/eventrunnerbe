@@ -153,20 +153,6 @@ REST_FRAMEWORK = {
     ),
 }
 
-#'rest_framework_simplejwt.authentication.JWTAuthentication',
-#'eventrunnerbe.utils.CustomJWTAuthentication',  
-
-#JWT_AUTH = {
-#    'JWT_PAYLOAD_GET_USERNAME_HANDLER':
-#        'eventrunnerbe.utils.jwt_get_username_from_payload_handler',
-#    'JWT_DECODE_HANDLER':
-#        'eventrunnerbe.utils.jwt_decode_token',
-#    'JWT_ALGORITHM': 'RS256',
-#    'JWT_AUDIENCE': 'https://eventrunner.com/api/',
-#    'JWT_ISSUER': 'https://dev-x8hbr3jrn2mxvw4x.us.auth0.com/',
-#    'JWT_AUTH_HEADER_PREFIX': 'Bearer',
-#}
-
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
