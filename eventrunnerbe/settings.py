@@ -149,7 +149,7 @@ STATIC_URL = '/static/'
 MEDIA_ROOT =  os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
 
-S3_ENABLED = config('S3_ENABLED', cast=bool, default=False)
+S3_ENABLED = config('S3_ENABLED', cast=bool, default=True)
 LOCAL_SERVE_MEDIA_FILES = config('LOCAL_SERVE_MEDIA_FILES', cast=bool, default=not S3_ENABLED)
 LOCAL_SERVE_STATIC_FILES = config('LOCAL_SERVE_STATIC_FILES', cast=bool, default=not S3_ENABLED)
 
@@ -174,13 +174,13 @@ if not LOCAL_SERVE_STATIC_FILES:
 
 if not LOCAL_SERVE_MEDIA_FILES:
     PUBLIC_MEDIA_DEFAULT_ACL = 'public-read'
-    PUBLIC_MEDIA_LOCATION = 'media/public'
+    PUBLIC_MEDIA_LOCATION = 'public'
 
     MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{PUBLIC_MEDIA_LOCATION}/'
     DEFAULT_FILE_STORAGE = 'eventrunnerbe.utilities.storage_backends.PublicMediaStorage'
 
     PRIVATE_MEDIA_DEFAULT_ACL = 'private'
-    PRIVATE_MEDIA_LOCATION = 'media/private'
+    PRIVATE_MEDIA_LOCATION = 'private'
     PRIVATE_FILE_STORAGE = 'eventrunnerbe.utilities.storage_backends.PrivateMediaStorage'
 
 # Default primary key field type
