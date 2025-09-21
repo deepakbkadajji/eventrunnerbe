@@ -44,6 +44,7 @@ urlpatterns = [
     
 
     path('events/images/<int:pk>/', views.getEventImage , name='event-api-eventimage'),
+    path('events/usableimages/<int:pk>/', views.getEventImageUsable , name='event-api-eventimageurl'),
 
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

@@ -15,6 +15,9 @@ import os
 from datetime import timedelta
 import django_on_heroku
 from decouple import config
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -24,13 +27,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY')
+SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = config('DEBUG', cast=bool, default=False)
 
-ALLOWED_HOSTS = ['start2finishtestus-62f5a9aed447.herokuapp.com']
-
+ALLOWED_HOSTS = [os.getenv('ALLOWED_HOSTS') , os.getenv('ALLOWED_HOSTS_2'), os.getenv('ALLOWED_HOSTS_3') , os.getenv('ALLOWED_HOSTS_4') ] 
+#ALLOWED_HOSTS = ['*.herokuapp.com','localhost', '127.0.0.1' , '10.0.2.2']
 
 # Application definition
 
@@ -90,12 +93,12 @@ WSGI_APPLICATION = 'eventrunnerbe.wsgi.application'
 #}
 DATABASES = {
     'default': {
-        'ENGINE': os.environ.get('DATABASE_ENGINE'),
-        'NAME': os.environ.get('DATABASE_DBNAME'),
-        'USER': os.environ.get('DATABASE_USER'),
-        'PASSWORD': os.environ.get('DATABASE_PASSWORD'),
-        'HOST': os.environ.get('DATABASE_HOST'),
-        'PORT': os.environ.get('DATABASE_PORT'),
+        'ENGINE': os.getenv('DATABASE_ENGINE'),
+        'NAME': os.getenv('DATABASE_DBNAME'),
+        'USER': os.getenv('DATABASE_USER'),
+        'PASSWORD': os.getenv('DATABASE_PASSWORD'),
+        'HOST': os.getenv('DATABASE_HOST'),
+        'PORT': os.getenv('DATABASE_PORT'),
     }
 }
 
@@ -184,9 +187,6 @@ if not LOCAL_SERVE_MEDIA_FILES:
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-ALLOWED_HOSTS = ['*.herokuapp.com','localhost', '127.0.0.1' , '10.0.2.2']
-
 
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',

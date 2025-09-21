@@ -47,7 +47,7 @@ class EventDetailTable(models.Model):
 
 #Participant table
 class ParticipantTable(models.Model):
-    user = models.ForeignKey(User , on_delete=models.RESTRICT , related_name='user' , default=3)
+    user = models.ForeignKey(User , on_delete=models.RESTRICT , related_name='user')
     title = models.CharField(max_length=10 , null=True , blank=True)
     surname = models.CharField(max_length=50, blank=True, null=True)
     firstname = models.CharField(max_length=50 , null=True, blank=True)

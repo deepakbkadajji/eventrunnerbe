@@ -22,6 +22,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.viewsets import ModelViewSet 
 
+
+
 #from eventrunnerbe.utils import customTokenBackend
 
 #from eventrunnerbe.utils import CustomJWTAuthentication
@@ -40,6 +42,40 @@ import json
 import requests
 
 from django.http import JsonResponse
+
+import boto3
+from django.conf import settings
+
+
+
+def generate_s3_presigned_url(object_key, expiration=600):
+    """
+    Generates a presigned URL for an S3 object.
+
+    Args:
+        object_key (str): The key (path) of the object in the S3 bucket.
+        expiration (int): The duration in seconds for which the presigned URL is valid.
+                          Defaults to 3600 seconds (1 hour).
+
+    Returns:
+        str: The presigned URL, or None if an error occurs.
+    """
+    s3_client = boto3.client(
+        's3',
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        region_name=settings.AWS_S3_REGION_NAME # Ensure this is defined in your settings.py
+    )
+    try:
+        response = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': settings.AWS_STORAGE_BUCKET_NAME, 'Key': object_key},
+            ExpiresIn=expiration
+        )
+        return response
+    except Exception as e:
+        print(f"Error generating presigned URL: {e}")
+        return None
 
 def get_token_auth_header(request):
     """Obtains the Access Token from the Authorization Header
@@ -222,10 +258,10 @@ def getParticipantExists(request , pk):
 #@requires_scope('create:profile')
 def createParticipant(request):
     data = request.data
+    print(data)
     participantdetail = ParticipantTable.objects.create(
         user = data['user'],
         title = data['title'],
-
         surname = data['surname'],
         firstname = data['firstname'],
         othernames = data['othernames'],
@@ -312,6 +348,31 @@ def getEventImage(request , pk):
     eventimgserializer = EventImageSerializer(eventimages , many=True)
     #return  Response(eventimgserializer.data)
     return  Response(eventimgserializer.data)
+
+##### Events images
+@api_view(['GET'])
+def getEventImageUsable(request , pk):
+    #eventDet = EventDetailTable.objects.get(id = pk)
+    eventimages = EventImages.objects.filter(event=pk)
+    if eventimages.count():
+        respResult = "Count is not zero"
+    else:
+        respResult = "Count is zero"
+
+    for obj in eventimages:
+        print(obj)  # Access attributes of the model instance
+        
+        presigned_url = generate_s3_presigned_url('media/public/' + obj.eventMainImg.name)
+
+        data = [
+            {            
+                'id': obj.id,
+                'event': obj.event.id,
+                'eventMainImg': presigned_url if presigned_url else None
+            }
+        ]
+
+    return  Response(data , status=status.HTTP_200_OK)
 
              
 class eventImageViewSet(ModelViewSet):
@@ -421,12 +482,53 @@ class participantViewSet(ModelViewSet):
         else:
             participantserializer = ParticipantSerializer(participant , many=False)
             return  Response(participantserializer.data, status=status.HTTP_200_OK)
+        
+    def create(self , request  , *args, **kwargs):
+
+        try:
+            participanrExists = ParticipantTable.objects.get(authid= request.data['authid'])   
+            return Response(participanrExists.id, status=status.HTTP_200_OK)
+        except ParticipantTable.DoesNotExist:
+            pass
+
+        try:
+            usrname = request.data["user"]
+            usr = User.objects.get(username= usrname)             
+        except User.DoesNotExist:
+            return Response("", status=status.HTTP_409_CONFLICT)
+        
+        participantTable = ParticipantTable.objects.create(
+            user = usr,
+            title = request.data['title'],
+            surname = request.data['surname'],
+            firstname = request.data['firstname'],
+            othernames = request.data['othernames'],
+            initials = request.data['initials'],
+            preferredname = request.data['preferredname'],
+            homelanguage = request.data['homelanguage'],
+            preferredlanguage = request.data['preferredlanguage'],
+            maidenname = request.data['maidenname'],
+            countryofissue = request.data['countryofissue'],
+            typefld = request.data['typefld'],
+            emailaddress = request.data['emailaddress'],
+            usrphonenum = request.data['usrphonenum'],
+            authid = request.data['authid']
+        )      
+
+        reqData = request.data
+
+        print(reqData)
+
+        participantserializer = ParticipantSerializer(participantTable , many=False)
+        return  Response(participantserializer.data , status=status.HTTP_201_CREATED)
     
     def update(self , request  , *args, **kwargs):
         participantId = request.data['id']
         participantTable = ParticipantTable.objects.get(id = participantId)        
 
         reqData = request.data
+
+        print(reqData)
 
         for reqAttr in request.data:
             if reqAttr == 'title':
@@ -453,6 +555,14 @@ class participantViewSet(ModelViewSet):
                 participantTable.usrphonenum = request.data[reqAttr]
             elif reqAttr == 'profilepic':
                 participantTable.profilepic = request.data[reqAttr]
+            elif reqAttr == 'user':
+                try:
+                    usrname = request.data[reqAttr]
+                    usr = User.objects.filter(username= request.data[reqAttr]) 
+                    participantTable.user = usr
+                except ParticipantTable.DoesNotExist:
+                    return Response("", status=status.HTTP_409_CONFLICT)
+                
         
         print(reqData)
         #participantTable.typefld = request.data['typefld']
