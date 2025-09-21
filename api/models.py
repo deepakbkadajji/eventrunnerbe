@@ -3,6 +3,9 @@ from django.db import models
 from .util import EventStatus
 from .util import Gender
 
+from utilities.storage_backends import PrivateMediaStorage
+from utilities.storage_backends import PublicMediaStorage
+
 # Event table
 class EventDetailTable(models.Model):
     eventid = models.CharField(max_length=20)
@@ -64,7 +67,7 @@ class ParticipantTable(models.Model):
     dateOfBirth = models.DateField( null=True, blank=True)
     emailaddress = models.CharField(max_length=50, null=True, blank=True)
     usrphonenum = models.CharField(max_length=50, null=True, blank=True)
-    profilepic = models.ImageField(upload_to='images/profilepic/' , blank=True , null=True)
+    profilepic = models.ImageField(upload_to='images/profilepic/' , blank=True , null=True , storage=PrivateMediaStorage())
     events = models.ManyToManyField(EventDetailTable , blank=True, null=True)
     authid = models.CharField(max_length=50, blank=False, null=False , unique=True)
 
@@ -74,7 +77,7 @@ class ParticipantTable(models.Model):
 
 class EventImages(models.Model):
     event = models.OneToOneField(EventDetailTable , related_name = 'event' , on_delete=models.CASCADE)
-    eventMainImg = models.ImageField(upload_to='images/eventsmain/' , blank=True , null=True)
+    eventMainImg = models.ImageField(upload_to='images/eventsmain/' , blank=True , null=True, storage=PrivateMediaStorage())
 
     def __str__(self):
         return 'image'
