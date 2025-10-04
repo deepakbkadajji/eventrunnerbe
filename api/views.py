@@ -586,8 +586,10 @@ class participantViewSet(ModelViewSet):
         #    return Response("Is valid")       
         #else:
         #    return Response("Is not valid")  
+        
+        participantserializer = ParticipantSerializer(participantTable , many=False)
 
-        return Response(participantTable.title , status=status.HTTP_200_OK)   
+        return Response(participantserializer.data , status=status.HTTP_200_OK)   
    
     def partial_update(self , request  , *args, **kwargs):
         participantId = request.data['id']
