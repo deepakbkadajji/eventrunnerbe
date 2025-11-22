@@ -46,7 +46,19 @@ class EventDetailTable(models.Model):
         return self.eventname
 
     class Meta:
-            ordering = ['-updated']
+        ordering = ['-updated']
+
+
+class EventSubDetailTable(models.Model):
+    name = models.CharField(max_length=50)
+    event = models.ForeignKey(EventDetailTable , on_delete=models.CASCADE , related_name='subevent')
+    eventsubdate = models.DateField()
+    regfees = models.DecimalField(max_digits=10, decimal_places=2)
+    regfeescurrency = models.CharField(max_length=10)
+
+    def __str__(self):
+        return self.event.eventname + ' ' + self.name 
+
 
 #Participant table
 class ParticipantTable(models.Model):
@@ -80,15 +92,34 @@ class EventImages(models.Model):
     eventMainImg = models.ImageField(upload_to='images/eventsmain/' , blank=True , null=True, storage=PrivateMediaStorage())
 
     def __str__(self):
-        return 'image'
-        
-#Event Participant table
-#class EventParticipantTable(models.Model):
-#    participant = models.ForeignKey(ParticipantTable , on_delete=models.CASCADE)
-#    eventid = models.ForeignKey(EventDetailTable, on_delete=models.CASCADE)
-#    participantstatus = models.CharField(max_length=50 , null=True)
-#    eventstatus = models.CharField(max_length=50 , null=True)
-#    eventlinkdate = models.DateTimeField(max_length=50)
+        return 'image'       
 
-#    def __str__(self):
-#        return self.participantstatus
+class ParticipantPaymRefTable(models.Model):
+    participant = models.ForeignKey(ParticipantTable , on_delete=models.RESTRICT , related_name='Participant')
+    merchant_id = models.CharField(max_length=10 , null=True , blank=True)
+    name_first = models.CharField(max_length=50, blank=True, null=True)
+    name_last = models.CharField(max_length=50 , null=True, blank=True)
+    email_address = models.CharField(max_length=99 , blank=True, null=True)
+    m_paym_id = models.CharField(max_length=30, null=True, blank=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    item_name = models.CharField(max_length=50, null=True, blank=True)
+    payment_uuid = models.CharField(max_length=50, null=True, blank=True)
+    payment_timestamp = models.CharField(max_length=30, null=True, blank=True)
+    payment_status = models.CharField(max_length=10, null=True, blank=True)
+
+    def __str__(self):
+        return self.participant.surname + ' ' + self.m_paym_id
+    
+
+#Event Participant table
+class ParticipantEventTable(models.Model):
+    participant = models.ForeignKey(ParticipantTable , on_delete=models.CASCADE)
+    event = models.ForeignKey(EventDetailTable, on_delete=models.CASCADE)
+    subevent = models.ForeignKey(EventSubDetailTable , on_delete=models.CASCADE )  
+    paymref = models.ForeignKey(ParticipantPaymRefTable , on_delete=models.DO_NOTHING )  
+    participantstatus = models.CharField(max_length=50 , null=True , blank=True)
+    eventregdate = models.DateTimeField(max_length=50 , null=True , blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.participant.surname + ' ' + self.event.eventname

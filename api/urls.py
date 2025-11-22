@@ -11,12 +11,11 @@ router = routers.DefaultRouter()
 
 router.register('EventImages' , views.eventImageViewSet)
 router.register('participantset' , views.participantViewSet)
+router.register('subevents' , views.EventSubViewSet)
+router.register('paymconfirminfo' , views.participantPaymViewSet)   
 
-
-urlpatterns = [
-    
+urlpatterns = [    
     #path('api/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
-
 ]
 
 urlpatterns = [
@@ -48,6 +47,8 @@ urlpatterns = [
 
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+
+    path('getavashyaka/', views.getPayfastConnectionDetails , name='api-getavashyaka'),
     
     #path('eventdetails/', views.EventDetailListCreate.as_view() , name='event-details-create'),
 ]

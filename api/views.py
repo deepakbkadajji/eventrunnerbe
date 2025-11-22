@@ -6,14 +6,27 @@ from rest_framework import generics
 from .serializers import EventDetailSerializer
 from .models import EventDetailTable
 
+from .serializers import EventSubDetailSerializer
+from .models import EventSubDetailTable
+
 from .serializers import ParticipantSerializer
 from .models import ParticipantTable
+
+from .serializers import ParticipantPaymTableSerializer
+from .models import ParticipantPaymRefTable
 
 from .serializers import EventImageSerializer
 from .models import EventImages
 
+from .models import ParticipantEventTable
+
 from .util import EventStatus
 from django.db.models import Q
+
+import os
+from decouple import config
+
+from django.db import transaction
 
 #from django.http import JsonResponse
 from rest_framework.permissions import IsAuthenticated
@@ -222,8 +235,11 @@ def deleteEvent(request , pk):
 #@requires_scope('read:events')
 def getEventsUnregistered(request , pk):
     participantdetail = ParticipantTable.objects.get(id = pk)
-    eventparticipantsdetail = participantdetail.events.all().values('id')
-    eventdetail = EventDetailTable.objects.exclude(id__in=eventparticipantsdetail).exclude(Q(eventstatus=EventStatus.Completed) | Q(eventstatus=EventStatus.Closed))
+    #eventparticipantsdetail = participantdetail.events.all().values('id')
+    eventlist = ParticipantEventTable.objects.filter(participant=participantdetail).filter(paymref__payment_status='Completed').values('event')
+    eventdetail = EventDetailTable.objects.exclude(id__in=eventlist).exclude(Q(eventstatus=EventStatus.Completed) | Q(eventstatus=EventStatus.Closed)).order_by('eventdate')
+
+    
 
     eventserializer = EventDetailSerializer(eventdetail , many=True)
     return  Response(eventserializer.data)
@@ -299,17 +315,30 @@ def deleteParticipant(request , pk):
 #@requires_scope('read:events')
 def getParticipantEvents(request, pk):
     participantdetail = ParticipantTable.objects.get(id = pk)
-    eventdetails = participantdetail.events.filter(eventstatus__in=[EventStatus.RegistrationOpen, EventStatus.RegistrationClosed])  
-    eventdetails.order_by('eventdate') 
-    eventserializer = EventDetailSerializer(eventdetails , many=True)
+    
+    #eventdetails = participantdetail.events.filter(eventstatus__in=[EventStatus.RegistrationOpen, EventStatus.RegistrationClosed])  
+    #eventdetails.order_by('eventdate') 
+    #eventserializer = EventDetailSerializer(eventdetails , many=True)
+
+
+    eventlist = ParticipantEventTable.objects.filter(participant=participantdetail).filter(paymref__payment_status='Completed').values('event')
+
+    eventRegDetails = EventDetailTable.objects.filter(id__in=eventlist).filter(eventstatus__in=[EventStatus.RegistrationOpen, EventStatus.RegistrationClosed]).order_by('eventdate')
+    eventserializer = EventDetailSerializer(eventRegDetails , many=True)
     return Response(eventserializer.data)
 
 @api_view(['GET'])
 #@requires_scope('read:events')
 def getParticipantCompletedEvents(request, pk):
     participantdetail = ParticipantTable.objects.get(id = pk)
-    eventdetails = participantdetail.events.filter(eventstatus__in=[EventStatus.Closed, EventStatus.Completed])   
-    eventserializer = EventDetailSerializer(eventdetails , many=True)
+    #eventdetails = participantdetail.events.filter(eventstatus__in=[EventStatus.Closed, EventStatus.Completed])   
+    #eventserializer = EventDetailSerializer(eventdetails , many=True)
+
+    eventlist = ParticipantEventTable.objects.filter(participant=participantdetail).filter(paymref__payment_status='Completed').values('event')
+
+    eventRegDetails = EventDetailTable.objects.filter(id__in=eventlist).filter(eventstatus__in=[EventStatus.Closed, EventStatus.Completed]).order_by('-eventdate')
+    eventserializer = EventDetailSerializer(eventRegDetails , many=True)
+
     return Response(eventserializer.data)
 
 @api_view(['POST'])
@@ -401,15 +430,6 @@ class eventImageViewSet(ModelViewSet):
         eventimgserializer = EventImageSerializer(eventImg , many=True)
         return Response(eventimgserializer.data)    
 
-    
-    #def list(self , request  , *args, **kwargs):
-    #    event = request.data['event']
-    #
-    #   eventDetTable = EventDetailTable.objects.get(id = event)        
-    #   eventImg = EventImages.objects.filter(event=event)
-    #
-    #    eventimgserializer = EventImageSerializer(eventImg , many=True)
-    #    return Response(eventimgserializer.data) 
     
 class participantCheckViewSet(ModelViewSet):
     queryset = ParticipantTable.objects.all()
@@ -555,13 +575,24 @@ class participantViewSet(ModelViewSet):
                 participantTable.usrphonenum = request.data[reqAttr]
             elif reqAttr == 'profilepic':
                 participantTable.profilepic = request.data[reqAttr]
+            elif reqAttr == 'event':
+
+                event = request.data[reqAttr]
+                try:
+                    eventDetTable = EventDetailTable.objects.get(id = event)  
+                    participantTable.events.add(eventDetTable)
+                    
+                except EventDetailTable.DoesNotExist:
+                    return Response("Event does not exists", status=status.HTTP_400_BAD_REQUEST)              
             elif reqAttr == 'user':
                 try:
                     usrname = request.data[reqAttr]
                     usr = User.objects.filter(username= request.data[reqAttr]) 
+                    if usr.count() == 0 :
+                        return Response("User does not exists", status=status.HTTP_400_BAD_REQUEST)
                     participantTable.user = usr
                 except ParticipantTable.DoesNotExist:
-                    return Response("", status=status.HTTP_409_CONFLICT)
+                    return Response("Something went wrong when retrieving user", status=status.HTTP_409_CONFLICT)
                 
         
         print(reqData)
@@ -622,4 +653,106 @@ class participantViewSet(ModelViewSet):
         else:
             return Response(participantId)   
 
-        return Response(participantserializer.data)   
+        return Response(participantserializer.data)    
+ 
+class participantPaymViewSet(ModelViewSet):
+    queryset = ParticipantPaymRefTable.objects.all()
+    serializer_class = ParticipantPaymTableSerializer
+    parser_classes = (MultiPartParser , FormParser , JSONParser)
+
+
+    def create(self , request  , *args, **kwargs):
+
+        try:
+            participantTable = ParticipantTable.objects.get(id= request.data['participant'])   
+        except ParticipantTable.DoesNotExist:
+            return Response("Participant not found", status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            eventTable = EventDetailTable.objects.get(id= request.data['event'])   
+        except EventDetailTable.DoesNotExist:
+            return Response("Event not found", status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            eventSubTable = EventSubDetailTable.objects.get(id= request.data['subevent'])   
+        except EventSubDetailTable.DoesNotExist:
+            return Response("Sub event not found", status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            with transaction.atomic():
+                participantPaymRefTable = ParticipantPaymRefTable.objects.create(
+                    participant = participantTable,
+                    merchant_id = request.data['merchant_id'],
+                    name_first = request.data['name_first'],
+                    name_last = request.data['name_last'],
+                    email_address = request.data['email_address'],
+                    m_paym_id = request.data['m_payment_id'],
+                    amount = request.data['amount'],
+                    item_name = request.data['item_name'],
+                    payment_uuid = request.data['payment_uuid'],
+                    payment_timestamp = request.data['payment_timestamp'],
+                    payment_status = request.data['payment_status']
+                )    
+
+                if request.data['payment_status'] == 'Completed':
+                    participantEventTable = ParticipantEventTable.objects.create(
+                        participant = participantTable,
+                        event = eventTable,
+                        subevent = eventSubTable,
+                        paymref = participantPaymRefTable
+                    )  
+            
+                participantpaymserializer = ParticipantPaymTableSerializer(participantPaymRefTable , many=False)
+
+        except Exception as e:
+            return Response("Error creating payment reference", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return  Response(participantpaymserializer.data , status=status.HTTP_201_CREATED)
+
+        
+    
+class EventSubViewSet(ModelViewSet):
+    queryset = EventSubDetailTable.objects.all()
+    serializer_class = EventSubDetailSerializer
+    parser_classes = (MultiPartParser , FormParser , JSONParser)
+
+    def retrieve(self , request  , *args, **kwargs):
+        eventid = request.data['event']        
+
+        eventsubDetTable = EventSubDetailTable.objects.filter(event = eventid)    
+
+        eventsubserializer = EventSubDetailSerializer(eventsubDetTable , many=True)
+        return  Response(eventsubserializer.data, status=status.HTTP_200_OK)
+    
+    def list(self , request  , *args, **kwargs):
+        body_unicode = request.body.decode('utf-8')
+        body = json.loads(body_unicode)
+        eventid = body['event']        
+
+        eventsubDetTable = EventSubDetailTable.objects.filter(event = eventid)    
+
+        eventsubserializer = EventSubDetailSerializer(eventsubDetTable , many=True)
+        return  Response(eventsubserializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def getPayfastConnectionDetails(request):
+
+    usesandbox = config('PAYFAST_USESANDBOX', cast=bool, default = True)
+    merchantid = os.getenv('PAYFAST_SANDBOX_MERCHANT_ID') if usesandbox == True else os.getenv('PAYFAST_MERCHANT_ID')
+    merchantkey = os.getenv('PAYFAST_SANDBOX_MERCHANT_KEY') if usesandbox == True else os.getenv('PAYFAST_MERCHANT_KEY')
+    merchantpassphrase = os.getenv('PAYFAST_SANDBOX_MERCHANT_PASSPHRASE') if usesandbox == True else os.getenv('PAYFAST_MERCHANT_PASSPHRASE')  
+    activationscript = str(os.getenv('PAYFAST_SANDBOX_MERCHANT_ACTIVESCRIPT')) if usesandbox == True else str(os.getenv('PAYFAST_MERCHANT_ACTIVESCRIPT')),  
+    activationscriptstring = ''.join(activationscript)
+    paymmethods = str(os.getenv('PAYFAST_SANDBOX_MERCHANT_PAYMMETHODS')) if usesandbox == True else str(os.getenv('PAYFAST_MERCHANT_PAYMMETHODS')),  
+
+    routes = {
+        'merchantid' : merchantid ,
+        'merchantkey' : merchantkey ,
+        'merchantpassphrase' : merchantpassphrase,     
+        'activationscript' : activationscriptstring,
+        'usesandbox' : usesandbox ,
+        'paymmethods' : paymmethods
+    }
+
+    return Response(routes)
