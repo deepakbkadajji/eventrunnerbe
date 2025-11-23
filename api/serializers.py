@@ -26,7 +26,7 @@ class EventDetailSerializer(serializers.ModelSerializer):
         #fields = '__all__'
         #field = ['id' , 'eventid' , 'eventname' , 'updated' , 'created' ]
         #,'eventimgs' , 'eventid'
-        fields = ['id' ,'eventname','eventdate','eventenddate','updated','created','contactpersonname','contactpersonsurname','contactpersonothername','contactpersonemailaddr','contactpersonphonenum','eventstatus','contactpersoncitizenship','contactpersonnationality','contactpersonprovince','contactpersoncountry','contactpersonaddrtype','contactpersonaddr1','contactpersonaddr2','contactpersonaddr3','contactpersonaddr4','contactpersonaddrcode','terminationstatus','eventdescription','eventtype','eventcategory','startPointLat','startPointLng' , 'subevents']
+        fields = ['id' , 'eventid' ,'eventname','eventdate','eventenddate','updated','created','contactpersonname','contactpersonsurname','contactpersonothername','contactpersonemailaddr','contactpersonphonenum','eventstatus','contactpersoncitizenship','contactpersonnationality','contactpersonprovince','contactpersoncountry','contactpersonaddrtype','contactpersonaddr1','contactpersonaddr2','contactpersonaddr3','contactpersonaddr4','contactpersonaddrcode','terminationstatus','eventdescription','eventtype','eventcategory','startPointLat','startPointLng' , 'subevents']
 
 
 
