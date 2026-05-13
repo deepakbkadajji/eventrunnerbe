@@ -13,6 +13,11 @@ router.register('EventImages' , views.eventImageViewSet)
 router.register('participantset' , views.participantViewSet)
 router.register('subevents' , views.EventSubViewSet)
 router.register('paymconfirminfo' , views.participantPaymViewSet)   
+router.register('eventmodel' , views.eventViewSet , basename='eventmodel')
+router.register('eventnotifications' , views.EventNotificationViewSet)
+router.register('eventsponsors' , views.EventSponsorViewSet)
+router.register('appsponsors' , views.AppSponsorViewSet)
+#router.register('eventdetails' , views.EventsDetailsView , basename='eventdetails')
 
 urlpatterns = [    
     #path('api/token/verify/', TokenVerifyView.as_view(), name='token_verify'),

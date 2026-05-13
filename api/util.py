@@ -22,3 +22,13 @@ class Gender(IntEnum):
   @classmethod
   def choices(cls):
     return [(key.value, key.name) for key in cls]
+  
+class SponsorCategory(IntEnum):
+  notDefined = 0
+  Primary = 1
+  Secondary = 2
+  Tertiary = 3
+  
+  @classmethod
+  def choices(cls):
+    return [(key.value, key.name) for key in cls]

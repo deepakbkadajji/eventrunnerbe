@@ -3,6 +3,8 @@ from django.contrib.auth.models import User
 from django.shortcuts import render
 from rest_framework import generics
 
+from rest_framework.views import APIView
+
 from .serializers import EventDetailSerializer
 from .models import EventDetailTable
 
@@ -18,6 +20,15 @@ from .models import ParticipantPaymRefTable
 from .serializers import EventImageSerializer
 from .models import EventImages
 
+from .serializers import EventNotificationSerializer
+from .models import EventNotificationTable
+
+from .serializers import EventSponsorSerializer
+from .models import EventSponsorTable
+
+from .serializers import AppSponsorSerializer
+from .models import AppSponsorTable
+
 from .models import ParticipantEventTable
 
 from .util import EventStatus
@@ -28,6 +39,8 @@ from decouple import config
 
 from django.db import transaction
 
+from django.utils import dateparse
+
 #from django.http import JsonResponse
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
@@ -35,7 +48,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.viewsets import ModelViewSet 
 
-
+from eventrunnerbe.notifications.utils import send_push_notification
 
 #from eventrunnerbe.utils import customTokenBackend
 
@@ -471,11 +484,14 @@ class participantViewSet(ModelViewSet):
     parser_classes = (MultiPartParser , FormParser , JSONParser)
 
     def retrieve(self , request  , *args, **kwargs):
+        participantEmailAddr = request.data['emailaddress']
         participantAuthid = request.data['authid']
         reqType = request.data['requesttype']  
         
-        participant = ParticipantTable.objects.get(authid = participantAuthid) 
+        #participant = ParticipantTable.objects.get(emailaddress = participantAuthid)
+        participant = ParticipantTable.objects.get(authid = participantAuthid)
         if  reqType == 'check':
+            #if (participant.emailaddress):
             if (participant.authid):
                 return Response("Participant exists" , status=status.HTTP_200_OK)
             else:
@@ -489,10 +505,12 @@ class participantViewSet(ModelViewSet):
 
         body_unicode = request.body.decode('utf-8')
         body = json.loads(body_unicode) 
+        participantEmailAddr = body['emailaddress']
         participantAuthid = body['authid']
         reqType = body['reqtype'] 
 
         try:
+            #participant = ParticipantTable.objects.get(emailaddress = participantAuthid)
             participant = ParticipantTable.objects.get(authid = participantAuthid)
         except ParticipantTable.DoesNotExist:
             return Response("", status=status.HTTP_204_NO_CONTENT)
@@ -505,8 +523,15 @@ class participantViewSet(ModelViewSet):
         
     def create(self , request  , *args, **kwargs):
 
+        is_many = isinstance(request.data, list)
+        if (is_many):
+            serializer = self.get_serializer(data=request.data, many=is_many)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
         try:
-            participanrExists = ParticipantTable.objects.get(authid= request.data['authid'])   
+            participanrExists = ParticipantTable.objects.get(emailaddress= request.data['emailaddress'])   
             return Response(participanrExists.id, status=status.HTTP_200_OK)
         except ParticipantTable.DoesNotExist:
             pass
@@ -515,7 +540,10 @@ class participantViewSet(ModelViewSet):
             usrname = request.data["user"]
             usr = User.objects.get(username= usrname)             
         except User.DoesNotExist:
-            return Response("", status=status.HTTP_409_CONFLICT)
+            return Response("Invalid user", status=status.HTTP_409_CONFLICT)
+        
+        if (request.data['emailaddress'] == None or request.data['emailaddress'] == ''):
+            return Response("Email address is required", status=status.HTTP_400_BAD_REQUEST)
         
         participantTable = ParticipantTable.objects.create(
             user = usr,
@@ -569,10 +597,20 @@ class participantViewSet(ModelViewSet):
                 participantTable.maidenname = request.data[reqAttr]
             elif reqAttr == 'countryofissue':
                 participantTable.countryofissue = request.data[reqAttr] 
-            elif reqAttr == 'emailaddress':
-                participantTable.emailaddress = request.data[reqAttr]
+            #elif reqAttr == 'emailaddress':
+            #    participantTable.emailaddress = request.data[reqAttr]
             elif reqAttr == 'usrphonenum':
                 participantTable.usrphonenum = request.data[reqAttr]
+            elif reqAttr == 'dateOfBirth':
+                datetime_object = dateparse.parse_datetime(request.data[reqAttr]) 
+                participantTable.dateOfBirth = datetime_object.date()
+            elif reqAttr == 'gender':
+                try:
+                    genderIntValue = int(request.data[reqAttr])                    
+                except (ValueError, TypeError):
+                    # Handle cases where the string cannot be converted to an integer
+                    raise ValueError("Invalid value for gender field. Must be an integer.")  
+                participantTable.gender = genderIntValue
             elif reqAttr == 'profilepic':
                 participantTable.profilepic = request.data[reqAttr]
             elif reqAttr == 'event':
@@ -653,8 +691,42 @@ class participantViewSet(ModelViewSet):
         else:
             return Response(participantId)   
 
-        return Response(participantserializer.data)    
- 
+        return Response(participantserializer.data)   
+
+class eventViewSet(ModelViewSet):
+    queryset = EventDetailTable.objects.all()
+    serializer_class = EventDetailSerializer
+    parser_classes = (MultiPartParser , FormParser , JSONParser)
+
+    def retrieve(self , request  , *args, **kwargs):
+        eventid = request.data['id']        
+
+        eventDetTable = EventDetailTable.objects.filter(id = eventid)    
+
+        events = EventDetailTable.objects.prefetch_related("subevent").filter(id=eventid)   
+        serializer = EventDetailSerializer(events, many=True)
+
+        eventserializer = EventDetailSerializer(eventDetTable , many=True)
+        return  Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def list(self , request  , *args, **kwargs):
+        try :
+            eventid = request.data['id']
+            events = EventDetailTable.objects.prefetch_related("eventimage_event").prefetch_related("subevent_event").prefetch_related("eventnotification_event").prefetch_related("eventsponsor_event").filter(id=eventid)  
+                
+        except KeyError:
+            events = EventDetailTable.objects.prefetch_related("eventimage_event").prefetch_related("subevent_event").prefetch_related("eventnotification_event").prefetch_related("eventsponsor_event").all()
+        except AttributeError:
+            events = EventDetailTable.objects.prefetch_related("eventimage_event").prefetch_related("subevent_event").prefetch_related("eventnotification_event").prefetch_related("eventsponsor_event").all()
+        #eventDetTable = EventDetailTable.objects.get(id = eventid)    
+
+        serializer = EventDetailSerializer(events, many=True)
+
+        #eventserializer = EventDetailSerializer(eventDetTable , many=False)
+        return  Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
 class participantPaymViewSet(ModelViewSet):
     queryset = ParticipantPaymRefTable.objects.all()
     serializer_class = ParticipantPaymTableSerializer
@@ -756,3 +828,269 @@ def getPayfastConnectionDetails(request):
     }
 
     return Response(routes)
+
+
+class EventsDetailsView(APIView):
+    queryset = EventDetailTable.objects.all()
+    serializer_class = EventDetailSerializer
+    parser_classes = (MultiPartParser , FormParser , JSONParser)
+
+    def get(self, request):
+        event_id = request.data['event']
+        events = EventDetailTable.objects.prefetch_related("EventSubDetailTable_set").filter(id=event_id)   
+        serializer = EventDetailSerializer(events, many=True)
+        return Response(serializer.data)
+    
+class NotifyUserView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        title = request.data.get("title", "Hello!")
+        message = request.data.get("message", "You have a new alert.")
+        user_ids = [str(request.user.id)]
+
+        result = send_push_notification(title, message, user_ids)
+        return Response(result)
+    
+
+class EventNotificationViewSet(ModelViewSet):
+    queryset = EventNotificationTable.objects.all()
+    serializer_class = EventNotificationSerializer
+    parser_classes = (MultiPartParser , FormParser , JSONParser)
+
+    def retrieve(self , request  , *args, **kwargs):
+        body_unicode = request.body.decode('utf-8')
+        body = json.loads(body_unicode)
+
+        eventIdFound = False
+        eventid = None
+        try :
+            eventid = body['event']    
+            eventIdFound = True          
+        except KeyError:
+            eventIdFound = False 
+        except AttributeError:
+            eventIdFound = False 
+
+        notificationIdFound = False
+        notificationId = None
+        try :
+            notificationId = body['id']    
+            notificationIdFound = True            
+        except KeyError:
+            notificationIdFound = False 
+        except AttributeError:
+            notificationIdFound = False 
+        
+        
+        if eventIdFound :            
+            eventnotificationtTable = EventNotificationTable.objects.filter(event = eventid)    
+            eventNotificationserializer = EventNotificationSerializer(eventnotificationtTable , many=True)
+        elif notificationIdFound :
+            eventnotificationtTable = EventNotificationTable.objects.filter(id = notificationId)    
+            eventNotificationserializer = EventNotificationSerializer(eventnotificationtTable , many=False)
+        else :
+            eventnotificationtTable = EventNotificationTable.objects.all()    
+            eventNotificationserializer = EventNotificationSerializer(eventnotificationtTable , many=True)  
+            
+        return  Response(eventNotificationserializer.data, status=status.HTTP_200_OK)
+    
+    def list(self , request  , *args, **kwargs):
+
+        body_unicode = request.body.decode('utf-8')
+        body = json.loads(body_unicode)
+
+        eventIdFound = False
+        eventid = None
+        try :
+            eventid = body['event']    
+            eventIdFound = True          
+        except KeyError:
+            eventIdFound = False 
+        except AttributeError:
+            eventIdFound = False 
+
+        notificationIdFound = False
+        notificationId = None
+        try :
+            notificationId = body['id']    
+            notificationIdFound = True            
+        except KeyError:
+            notificationIdFound = False 
+        except AttributeError:
+            notificationIdFound = False 
+        
+        
+        if eventIdFound :            
+            eventnotificationtTable = EventNotificationTable.objects.filter(event = eventid)    
+            eventNotificationserializer = EventNotificationSerializer(eventnotificationtTable , many=True)
+        elif notificationIdFound :
+            eventnotificationtTable = EventNotificationTable.objects.get(id = notificationId)    
+            eventNotificationserializer = EventNotificationSerializer(eventnotificationtTable , many=False)
+        else :
+            eventnotificationtTable = EventNotificationTable.objects.all()    
+            eventNotificationserializer = EventNotificationSerializer(eventnotificationtTable , many=True)  
+
+        return  Response(eventNotificationserializer.data, status=status.HTTP_200_OK)
+    
+
+class EventSponsorViewSet(ModelViewSet):
+    queryset = EventSponsorTable.objects.all()
+    serializer_class = EventSponsorSerializer
+    parser_classes = (MultiPartParser , FormParser , JSONParser)
+
+    def retrieve(self , request  , *args, **kwargs):
+        body_unicode = request.body.decode('utf-8')
+        body = json.loads(body_unicode)
+
+        eventIdFound = False
+        eventid = None
+        try :
+            eventid = body['event']    
+            eventIdFound = True          
+        except KeyError:
+            eventIdFound = False 
+        except AttributeError:
+            eventIdFound = False 
+
+        sponsorIdFound = False
+        sponsorId = None
+        try :
+            sponsorId = body['id']    
+            sponsorIdFound = True            
+        except KeyError:
+            sponsorIdFound = False 
+        except AttributeError:
+            sponsorIdFound = False 
+        
+        
+        if eventIdFound :            
+            eventsponsortTable = EventSponsorTable.objects.filter(event = eventid)    
+            eventSponsorserializer = EventSponsorSerializer(eventsponsortTable , many=True)
+        elif sponsorIdFound :
+            eventsponsortTable = EventSponsorTable.objects.get(id = sponsorId)    
+            eventSponsorserializer = EventSponsorSerializer(eventsponsortTable , many=False)
+        else :
+            eventsponsortTable = EventSponsorTable.objects.all()    
+            eventSponsorserializer = EventSponsorSerializer(eventsponsortTable , many=True)  
+            
+        return  Response(eventSponsorserializer.data, status=status.HTTP_200_OK)
+    
+    def list(self , request  , *args, **kwargs):
+
+        body_unicode = request.body.decode('utf-8')
+        body = json.loads(body_unicode)
+
+        eventIdFound = False
+        eventid = None
+        try :
+            eventid = body['event']    
+            eventIdFound = True          
+        except KeyError:
+            eventIdFound = False 
+        except AttributeError:
+            eventIdFound = False 
+
+        sponsorIdFound = False
+        sponsorId = None
+        try :
+            sponsorId = body['id']    
+            sponsorIdFound = True            
+        except KeyError:
+            sponsorIdFound = False 
+        except AttributeError:
+            sponsorIdFound = False 
+        
+        
+        if eventIdFound :            
+            eventsponsortTable = EventSponsorTable.objects.filter(event = eventid)    
+            eventSponsorserializer = EventSponsorSerializer(eventsponsortTable , many=True)
+        elif sponsorIdFound :
+            eventsponsortTable = EventSponsorTable.objects.get(id = sponsorId)    
+            eventSponsorserializer = EventSponsorSerializer(eventsponsortTable , many=False)
+        else :
+            eventsponsortTable = EventSponsorTable.objects.all()    
+            eventSponsorserializer = EventSponsorSerializer(eventsponsortTable , many=True)  
+
+        return  Response(eventSponsorserializer.data, status=status.HTTP_200_OK)
+    
+
+class AppSponsorViewSet(ModelViewSet):
+    queryset = AppSponsorTable.objects.all()
+    serializer_class = AppSponsorSerializer
+    parser_classes = (MultiPartParser , FormParser , JSONParser)
+
+    def retrieve(self , request  , *args, **kwargs):
+        body_unicode = request.body.decode('utf-8')
+        body = json.loads(body_unicode)
+
+        eventIdFound = False
+        eventid = None
+        try :
+            eventid = body['event']    
+            eventIdFound = True          
+        except KeyError:
+            eventIdFound = False 
+        except AttributeError:
+            eventIdFound = False 
+
+        sponsorIdFound = False
+        sponsorId = None
+        try :
+            sponsorId = body['id']    
+            sponsorIdFound = True            
+        except KeyError:
+            sponsorIdFound = False 
+        except AttributeError:
+            sponsorIdFound = False 
+        
+        
+        if eventIdFound :            
+            appSponsorTable = AppSponsorTable.objects.filter(event = eventid)    
+            appSponsorializer = AppSponsorSerializer(appSponsorTable , many=True)
+        elif sponsorIdFound :
+            appSponsorTable = AppSponsorTable.objects.filter(id = sponsorId)    
+            appSponsorializer = AppSponsorSerializer(appSponsorTable , many=False)
+        else :
+            appSponsorTable = AppSponsorTable.objects.all()    
+            appSponsorializer = AppSponsorSerializer(appSponsorTable , many=True)  
+            
+        return  Response(appSponsorializer.data, status=status.HTTP_200_OK)
+    
+    def list(self , request  , *args, **kwargs):
+
+        body_unicode = request.body.decode('utf-8')
+        body = json.loads(body_unicode)
+
+        eventIdFound = False
+        eventid = None
+        try :
+            eventid = body['event']    
+            eventIdFound = True          
+        except KeyError:
+            eventIdFound = False 
+        except AttributeError:
+            eventIdFound = False 
+
+        sponsorIdFound = False
+        sponsorId = None
+        try :
+            sponsorId = body['id']    
+            sponsorIdFound = True            
+        except KeyError:
+            sponsorIdFound = False 
+        except AttributeError:
+            sponsorIdFound = False 
+        
+        
+        if eventIdFound :            
+            appSponsorTable = AppSponsorTable.objects.filter(event = eventid)    
+            appSponsorializer = AppSponsorSerializer(appSponsorTable , many=True)
+        elif sponsorIdFound :
+            appSponsorTable = AppSponsorTable.objects.get(id = sponsorId)    
+            appSponsorializer = AppSponsorSerializer(appSponsorTable , many=False)
+        else :
+            appSponsorTable = AppSponsorTable.objects.all()    
+            appSponsorializer = AppSponsorSerializer(appSponsorTable , many=True)  
+
+        return  Response(appSponsorializer.data, status=status.HTTP_200_OK)

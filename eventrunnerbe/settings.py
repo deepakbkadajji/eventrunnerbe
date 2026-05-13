@@ -244,5 +244,10 @@ SIMPLE_JWT = {
     "SLIDING_TOKEN_REFRESH_SERIALIZER": "rest_framework_simplejwt.serializers.TokenRefreshSlidingSerializer",
 }
 
+ONESIGNAL_APP_ID = os.getenv('ONESIGNAL_APP_ID')
+ONESIGNAL_API_KEY = os.getenv('ONESIGNAL_API_KEY')
+ONESIGNAL_API_URL = os.getenv('ONESIGNAL_API_URL') 
+
+
 # Configure Django App for Heroku.
 django_on_heroku.settings(locals())
