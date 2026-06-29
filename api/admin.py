@@ -10,6 +10,7 @@ from .models import EventNotificationTable
 from .models import EventCategoryTable
 from .models import EventSponsorTable
 from .models import AppSponsorTable
+from .models import EventInformationTable
 
 admin.site.register(EventDetailTable)
 admin.site.register(ParticipantTable)
@@ -21,3 +22,4 @@ admin.site.register(EventNotificationTable)
 admin.site.register(EventCategoryTable)
 admin.site.register(EventSponsorTable)
 admin.site.register(AppSponsorTable)
+admin.site.register(EventInformationTable)

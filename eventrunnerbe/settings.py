@@ -47,7 +47,8 @@ INSTALLED_APPS = [
     'storages',
     'api.apps.ApiConfig',
     'rest_framework',
-    'rest_framework_simplejwt'
+    'rest_framework_simplejwt',
+    'web'
 ]
 
 MIDDLEWARE = [
@@ -251,3 +252,18 @@ ONESIGNAL_API_URL = os.getenv('ONESIGNAL_API_URL')
 
 # Configure Django App for Heroku.
 django_on_heroku.settings(locals())
+
+
+LOGIN_REDIRECT_URL = '/userhome/'
+
+LOGIN_URL = '/login/'
+
+SESSION_COOKIE_AGE = config('SESSION_COOKIE_AGE', cast=int, default=3600)      # half an hour
+
+SESSION_COOKIE_HTTPONLY = config('SESSION_COOKIE_HTTPONLY', cast=bool, default=True)
+
+SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', cast=bool, default=True)    # HTTPS only
+
+CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', cast=bool, default=True)    # HTTPS only
+
+SESSION_SAVE_EVERY_REQUEST = config('SESSION_SAVE_EVERY_REQUEST', cast=bool, default=True)

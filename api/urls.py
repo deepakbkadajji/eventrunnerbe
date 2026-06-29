@@ -6,6 +6,9 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 
+from django.urls import path
+from .views import users
+
 
 router = routers.DefaultRouter()
 
@@ -17,6 +20,7 @@ router.register('eventmodel' , views.eventViewSet , basename='eventmodel')
 router.register('eventnotifications' , views.EventNotificationViewSet)
 router.register('eventsponsors' , views.EventSponsorViewSet)
 router.register('appsponsors' , views.AppSponsorViewSet)
+router.register('eventinformation' , views.eventInfoViewSet)
 #router.register('eventdetails' , views.EventsDetailsView , basename='eventdetails')
 
 urlpatterns = [    
@@ -56,4 +60,8 @@ urlpatterns = [
     path('getavashyaka/', views.getPayfastConnectionDetails , name='api-getavashyaka'),
     
     #path('eventdetails/', views.EventDetailListCreate.as_view() , name='event-details-create'),
+
+    path('users/', users),
 ]
+
+

@@ -8,8 +8,8 @@ from .models import EventImages
 from .models import EventSubDetailTable
 from .models import EventNotificationTable
 from .models import EventSponsorTable
+from .models import EventInformationTable
 from .models import User
-
 
 class EventImageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -22,7 +22,7 @@ class EventSubDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = EventSubDetailTable
-        fields = ['id' , 'event', 'name' , 'eventcategory' , 'category_name' , 'eventsubdate' , 'regfees' , 'regfeescurrency' ]
+        fields = ['id' , 'event', 'name' , 'eventcategory' , 'category_name' , 'eventsubdate' , 'regfees' , 'regfeescurrency' , 'elevationImg' ]
 
 class EventNotificationSerializer(serializers.ModelSerializer):
 
@@ -54,7 +54,10 @@ class EventDetailSerializer(serializers.ModelSerializer):
         #,'eventimgs' , 'eventid'
         fields = ['id' , 'eventid' ,'eventname','eventdate','eventenddate','updated','created','contactpersonname','contactpersonsurname','contactpersonothername','contactpersonemailaddr','contactpersonphonenum','eventstatus','contactpersoncitizenship','contactpersonnationality','contactpersonprovince','contactpersoncountry','contactpersonaddrtype','contactpersonaddr1','contactpersonaddr2','contactpersonaddr3','contactpersonaddr4','contactpersonaddrcode','terminationstatus','eventdescription','eventtype','eventcategory','startPointLat','startPointLng' , 'subevents' , 'eventimage' , 'eventnotifications', 'eventsponsors']
 
-
+class EventInformationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventInformationTable
+        fields = '__all__'
 
 class ParticipantSerializer(serializers.ModelSerializer):
 

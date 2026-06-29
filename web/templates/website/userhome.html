@@ -1,0 +1,32 @@
+{% extends 'website/basepage.html' %}
+
+{% block title %}
+Home
+{% endblock %}
+
+{% block content %}
+
+    <!-- Bottom Pane -->
+<main class="content">
+    <div class="card">
+        <h1>Welcome</h1>
+        <p>
+            This is the content area. You can load data from your Django
+            REST API here using JavaScript and display it dynamically.
+        </p>
+
+        <p>
+            Example:
+        </p>
+
+        <pre>   
+    GET /api/customers/
+    GET /api/orders/
+    GET /api/products/
+        </pre>
+    </div>
+</main>
+
+{% endblock %}
+
+

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{% block title %}Start 2 Finish{% endblock %}</title>
+
+    <style>
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .navbar {
+            background: #2563eb;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 25px;
+            align-items: center;
+        }
+
+        .navbar a {
+            color: white;
+            text-decoration: none;
+        }
+
+        .current-page {
+            color: #dbeafe;
+            font-weight: bold;
+            cursor: default;
+        }
+
+        .logout-btn {
+            background: #dc2626;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="navbar">
+    <div class="logo">Start 2 Finish</div>
+
+    {% if request.resolver_match.url_name == 'userhome' %}
+        <span class="current-page">Home</span>
+    {% else %}
+        <a href="{% url 'userhome' %}">Home</a>
+    {% endif %}
+
+    {% if request.resolver_match.url_name == 'events' %}
+        <span class="current-page">Events</span>
+    {% else %}
+        <a href="{% url 'events' %}">Events</a>
+    {% endif %}
+
+    {% if request.resolver_match.url_name == 'participants' %}
+        <span class="current-page">Participants</span>
+    {% else %}
+        <a href="{% url 'participants' %}">Participants</a>
+    {% endif %}
+
+    {% if user.is_authenticated %}
+    <form method="POST"
+          action="{% url 'logout' %}"
+          style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="logout-btn">
+            Logout
+        </button>
+    </form>
+    {% endif %}
+
+</div>
+
+{% block content %}
+{% endblock %}
+
+</body>
+</html>

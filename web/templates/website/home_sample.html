@@ -1,0 +1,33 @@
+{% extends 'website/base.html' %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<h1>Welcome</h1>
+
+<p>
+    This website uses a Django REST API backend.
+</p>
+
+<button onclick="loadUsers()">
+    Load Users
+</button>
+
+<ul id="users"></ul>
+
+<script>
+async function loadUsers() {
+    const response = await fetch('/api/participants/');
+    const users = await response.json();
+
+    const list = document.getElementById('users');
+    list.innerHTML = '';
+
+    users.forEach(user => {
+        const li = document.createElement('li');
+        li.textContent = user.firstname + ' ' + user.surname + ' (' + user.emailaddress + ')';
+        list.appendChild(li);
+    });
+}
+</script>
+{% endblock %}

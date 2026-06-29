@@ -29,6 +29,10 @@ from .models import EventSponsorTable
 from .serializers import AppSponsorSerializer
 from .models import AppSponsorTable
 
+
+from .serializers import EventInformationSerializer
+from .models import EventInformationTable
+
 from .models import ParticipantEventTable
 
 from .util import EventStatus
@@ -806,7 +810,6 @@ class EventSubViewSet(ModelViewSet):
         eventsubserializer = EventSubDetailSerializer(eventsubDetTable , many=True)
         return  Response(eventsubserializer.data, status=status.HTTP_200_OK)
 
-
 @api_view(['GET'])
 def getPayfastConnectionDetails(request):
 
@@ -1014,7 +1017,86 @@ class EventSponsorViewSet(ModelViewSet):
 
         return  Response(eventSponsorserializer.data, status=status.HTTP_200_OK)
     
+class eventInfoViewSet(ModelViewSet):
+    queryset = EventInformationTable.objects.all()
+    serializer_class = EventInformationSerializer
+    parser_classes = (MultiPartParser , FormParser , JSONParser)
 
+    def retrieve(self , request  , *args, **kwargs):
+        body_unicode = request.data.decode('utf-8')
+        body = json.loads(body_unicode)
+
+        eventIdFound = False
+        eventid = None
+        try :
+            eventid = body['event']    
+            eventIdFound = True          
+        except KeyError:
+            eventIdFound = False 
+        except AttributeError:
+            eventIdFound = False 
+
+        infoIdFound = False
+        infoId = None
+        try :
+            infoId = body['id']    
+            infoIdFound = True            
+        except KeyError:
+            infoIdFound = False 
+        except AttributeError:
+            infoIdFound = False 
+        
+        
+        if eventIdFound :            
+            eventInfoTable = EventInformationTable.objects.filter(event = eventid)    
+            eventInfoSerializer = EventInformationSerializer(eventInfoTable , many=True)
+        elif infoIdFound :
+            eventInfoTable = EventInformationTable.objects.get(id = infoId)    
+            eventInfoSerializer = EventInformationSerializer(eventInfoTable , many=False)
+        else :
+            eventInfoTable = EventInformationTable.objects.all()    
+            eventInfoSerializer = EventInformationSerializer(eventInfoTable , many=True)  
+            
+        return  Response(eventInfoSerializer.data, status=status.HTTP_200_OK)
+    
+    def list(self , request  , *args, **kwargs):
+
+        body_unicode = request.body.decode('utf-8')
+        body = json.loads(body_unicode) 
+
+        eventIdFound = False
+        eventid = None
+        try :
+            eventid = body['event']    
+            eventIdFound = True          
+        except KeyError:
+            eventIdFound = False 
+        except AttributeError:
+            eventIdFound = False 
+
+        infoIdFound = False
+        infoId = None
+        try :
+            infoId = body['id']    
+            infoIdFound = True            
+        except KeyError:
+            infoIdFound = False 
+        except AttributeError:
+            infoIdFound = False 
+        
+        
+        if eventIdFound :            
+            eventInfoTable = EventInformationTable.objects.filter(event = eventid)    
+            eventInfoSerializer = EventInformationSerializer(eventInfoTable , many=True)
+        elif infoIdFound :
+            eventInfoTable = EventInformationTable.objects.get(id = infoId)    
+            eventInfoSerializer = EventInformationSerializer(eventInfoTable , many=False)
+        else :
+            eventInfoTable = EventInformationTable.objects.all()    
+            eventInfoSerializer = EventInformationSerializer(eventInfoTable , many=True)  
+            
+        return  Response(eventInfoSerializer.data, status=status.HTTP_200_OK)
+        
 class AppSponsorViewSet(ModelViewSet):
     queryset = AppSponsorTable.objects.all()
     serializer_class = AppSponsorSerializer
@@ -1094,3 +1176,12 @@ class AppSponsorViewSet(ModelViewSet):
             appSponsorializer = AppSponsorSerializer(appSponsorTable , many=True)  
 
         return  Response(appSponsorializer.data, status=status.HTTP_200_OK)
+    
+
+
+@api_view(['GET'])
+def users(request):
+    return Response([
+        {"id": 1, "name": "Deepak"},
+        {"id": 2, "name": "John"}
+    ])

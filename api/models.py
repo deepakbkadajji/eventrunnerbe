@@ -42,7 +42,6 @@ class EventDetailTable(models.Model):
     startPointLat = models.DecimalField(null=True, max_digits=17, decimal_places=14)
     startPointLng = models.DecimalField(null=True, max_digits=17, decimal_places=14)
 
-
     def __str__(self):
         return self.eventname
 
@@ -51,6 +50,7 @@ class EventDetailTable(models.Model):
 
 class EventCategoryTable(models.Model):
     categoryname = models.CharField(max_length=50 , null=False , blank=False)
+    #categoryImg = models.ImageField(upload_to='images/eventCategoryImg/' , blank=True , null=True, storage=PrivateMediaStorage())
 
     def __str__(self):
         return self.categoryname
@@ -64,10 +64,18 @@ class EventSubDetailTable(models.Model):
     regfees = models.DecimalField(max_digits=10, decimal_places=2)
     regfeescurrency = models.CharField(max_length=10)
     displaysequence = models.IntegerField(default=0)
+    elevationImg = models.ImageField(upload_to='images/subeventsElevationImg/' , blank=True , null=True, storage=PrivateMediaStorage())
 
     def __str__(self):
         return self.event.eventname + ' ' + self.name 
 
+class EventInformationTable(models.Model):
+    name = models.CharField(max_length=20)
+    event = models.ForeignKey(EventDetailTable , on_delete=models.CASCADE , related_name='eventinfo_event')
+    infoImg = models.ImageField(upload_to='images/eventInformationImg/' , blank=True , null=True, storage=PrivateMediaStorage())
+
+    def __str__(self):
+        return self.event.eventname + ' ' + self.name 
 
 #Participant table
 class ParticipantTable(models.Model):
