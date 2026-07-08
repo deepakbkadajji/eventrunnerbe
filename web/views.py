@@ -4,6 +4,7 @@ from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from api.models import ParticipantTable
 from api.models import EventDetailTable
+from api.serializers import EventSubDetailSerializer
 
 # Create your views here.
 def home(request):
@@ -32,9 +33,32 @@ def event_details(request, id):
         id=id
     )
 
+    subevents = event.subevent_event.all()
+    subeventsSerializer = EventSubDetailSerializer(
+        subevents,
+        many=True
+    )
+
     return render(
         request,
         "website/event-details.html",
+        {
+            "event": event , 
+            "sub_events": subeventsSerializer.data , 
+            "event_id" : event.id
+        }
+    )
+
+@login_required
+def event_details_edit(request, id):
+
+    event = EventDetailTable.objects.get(
+        id=id
+    )
+
+    return render(
+        request,
+        "website/event-details-edit.html",
         {
             "event": event
         }
@@ -101,6 +125,17 @@ def participant_details(request, id):
         "website/participant-details.html",
         {
             "participant": participant
+        }
+    )
+
+@login_required
+def event_participants(request, id):
+
+    return render(
+        request,
+        "website/event-participants.html",
+        {
+            "event_id": id
         }
     )
 

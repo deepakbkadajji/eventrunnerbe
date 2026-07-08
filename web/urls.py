@@ -12,6 +12,10 @@ urlpatterns = [
         'events/<int:id>/', 
         views.event_details, 
         name='event_details'),
+    path(
+        'events-edit/<int:id>/', 
+        views.event_details_edit, 
+        name='event_details_edit'),
     #path("login2/", views.login_view, name="login"),
     path(
         'participants/',
@@ -24,6 +28,10 @@ urlpatterns = [
         views.participant_details,
         name='participant_details'
     ),
+    path(
+        'event_participants/<int:id>/', 
+        views.event_participants, 
+        name='event_participants'),
     path(
         'login/',
         auth_views.LoginView.as_view(

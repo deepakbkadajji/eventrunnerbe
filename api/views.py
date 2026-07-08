@@ -6,7 +6,7 @@ from rest_framework import generics
 from rest_framework.views import APIView
 
 from .serializers import EventDetailSerializer
-from .models import EventDetailTable
+from .models import EventCategoryTable, EventDetailTable
 
 from .serializers import EventSubDetailSerializer
 from .models import EventSubDetailTable
@@ -43,7 +43,7 @@ from decouple import config
 
 from django.db import transaction
 
-from django.utils import dateparse
+from django.utils import dateparse, timezone
 
 #from django.http import JsonResponse
 from rest_framework.permissions import IsAuthenticated
@@ -53,6 +53,8 @@ from rest_framework import status
 from rest_framework.viewsets import ModelViewSet 
 
 from eventrunnerbe.notifications.utils import send_push_notification
+
+from openpyxl import load_workbook
 
 #from eventrunnerbe.utils import customTokenBackend
 
@@ -346,6 +348,18 @@ def getParticipantEvents(request, pk):
 
 @api_view(['GET'])
 #@requires_scope('read:events')
+def getEventsParticipant(request, pk):
+    eventDetTable = EventDetailTable.objects.get(id = pk)
+    
+    participantslist = ParticipantEventTable.objects.filter(event=eventDetTable).filter(paymref__payment_status='Completed').values('participant')
+
+    particpantsDetails = ParticipantTable.objects.filter(id__in=participantslist)
+    particpantsserializer = ParticipantSerializer(particpantsDetails , many=True)
+
+    return Response(particpantsserializer.data)
+
+@api_view(['GET'])
+#@requires_scope('read:events')
 def getParticipantCompletedEvents(request, pk):
     participantdetail = ParticipantTable.objects.get(id = pk)
     #eventdetails = participantdetail.events.filter(eventstatus__in=[EventStatus.Closed, EventStatus.Completed])   
@@ -420,7 +434,7 @@ def getEventImageUsable(request , pk):
 
     return  Response(data , status=status.HTTP_200_OK)
 
-             
+            
 class eventImageViewSet(ModelViewSet):
     queryset = EventImages.objects.all()
     serializer_class = EventImageSerializer
@@ -490,13 +504,13 @@ class participantViewSet(ModelViewSet):
     def retrieve(self , request  , *args, **kwargs):
         participantEmailAddr = request.data['emailaddress']
         participantAuthid = request.data['authid']
-        reqType = request.data['requesttype']  
+        reqType = request.data['reqtype']  
         
-        #participant = ParticipantTable.objects.get(emailaddress = participantAuthid)
-        participant = ParticipantTable.objects.get(authid = participantAuthid)
+        participant = ParticipantTable.objects.get(emailaddress = participantEmailAddr)
+        #participant = ParticipantTable.objects.get(authid = participantAuthid)
         if  reqType == 'check':
-            #if (participant.emailaddress):
-            if (participant.authid):
+            if (participant.emailaddress):
+            #if (participant.authid):
                 return Response("Participant exists" , status=status.HTTP_200_OK)
             else:
                 return Response("Participant does not exist" , status=status.HTTP_204_NO_CONTENT)   
@@ -514,8 +528,8 @@ class participantViewSet(ModelViewSet):
         reqType = body['reqtype'] 
 
         try:
-            #participant = ParticipantTable.objects.get(emailaddress = participantAuthid)
-            participant = ParticipantTable.objects.get(authid = participantAuthid)
+            participant = ParticipantTable.objects.get(emailaddress = participantEmailAddr)
+            #participant = ParticipantTable.objects.get(authid = participantAuthid)
         except ParticipantTable.DoesNotExist:
             return Response("", status=status.HTTP_204_NO_CONTENT)
 
@@ -809,6 +823,14 @@ class EventSubViewSet(ModelViewSet):
 
         eventsubserializer = EventSubDetailSerializer(eventsubDetTable , many=True)
         return  Response(eventsubserializer.data, status=status.HTTP_200_OK)
+    
+@api_view(['GET'])
+def getSubeventsEvent(request , pk):
+    subevents = EventSubDetailTable.objects.filter(event=pk)
+    subeventserializer = EventSubDetailSerializer(subevents , many=True)
+
+    return Response(subeventserializer.data, status=status.HTTP_200_OK)
+
 
 @api_view(['GET'])
 def getPayfastConnectionDetails(request):
@@ -1185,3 +1207,116 @@ def users(request):
         {"id": 1, "name": "Deepak"},
         {"id": 2, "name": "John"}
     ])
+
+class ParticipantImportView(APIView):
+
+    def post(self, request):
+
+        excel_file = request.FILES.get("file")
+
+        if excel_file is None:
+            return Response(
+                {"message":"No file selected"},
+                status=400
+            )
+
+        # Read Excel here using openpyxl or pandas
+
+        workbook = load_workbook(excel_file)
+
+        worksheet = workbook["Entrants"]
+
+        imported = 0
+        importedParticipant = 0
+        updatedParticipant = 0
+        errors = []
+
+        usr = User.objects.get(username= 'Participant')        
+
+        #
+        # Skip header row
+        #
+        for row_number, row in enumerate(
+                worksheet.iter_rows(min_row=2, values_only=True),
+                start=2):
+
+            try:
+                
+                with transaction.atomic():
+                    participant_id      = row[0]
+                    event_id            = row[1]
+                    event_name          = row[2]
+                    first_name          = row[3]
+                    last_name           = row[4]
+                    category            = row[5]
+                    distance_entered    = row[6]   
+                    province            = row[7]
+                    comp_shirt          = row[8]
+                    email               = row[9]
+                    cell_phone          = row[10]
+
+                    #event = EventDetailTable.objects.get(id=event_id)
+                    event = EventDetailTable.objects.filter(eventname=event_name).first()
+                    category = EventCategoryTable.objects.filter(categoryname=category).first()
+
+                    
+
+                    participant, created = ParticipantTable.objects.update_or_create(
+                        emailaddress=email,
+                        defaults={
+                            "firstname": first_name,
+                            "surname": last_name,
+                            "emailaddress": email,
+                            "usrphonenum": cell_phone,
+                            "user" : usr
+                        }
+                    )
+
+                    subevent = EventSubDetailTable.objects.filter(event=event).filter(eventcategory=category).filter(name=distance_entered).first()
+
+                    m_paym_id = f"imported-{participant.id}-{event.id}-{subevent.id}"[:30]
+                    item_name = f"Imported from Excel - {event.eventname} - {subevent.name}"[:50]
+                    payment_uuid = f"imported-{participant.id}-{event.id}-{subevent.id}"[:50]
+
+                    current_datetime = timezone.now()
+                    datetime_string = current_datetime.strftime("%Y-%m-%d %H:%M:%S")[:30]
+
+                    participantPaymRefTable = ParticipantPaymRefTable.objects.create(
+                        participant = participant,
+                        m_paym_id = m_paym_id,
+                        amount = 0.00,
+                        item_name = item_name,
+                        payment_uuid = payment_uuid,
+                        payment_timestamp = datetime_string,
+                        payment_status = 'Completed'
+                    )
+
+                    participantEvent = ParticipantEventTable.objects.create(
+                        participant = participant,
+                        event = event,
+                        subevent = subevent,
+                        paymref = participantPaymRefTable,
+                        participantstatus = "Imported from Excel",
+                        eventregdate = timezone.now()
+                    )
+
+                    if participantEvent is not None:
+                        imported += 1
+
+                    if created :
+                        importedParticipant += 1
+                    else:
+                        updatedParticipant += 1
+
+            except Exception as ex:
+
+                errors.append(
+                    f"Row {row_number}: {str(ex)}"
+                )
+
+        return Response({
+            "imported": imported,
+            "participants_created": importedParticipant,
+            "participants_updated": updatedParticipant,
+            "errors": errors
+        })

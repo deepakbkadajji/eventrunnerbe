@@ -1,0 +1,255 @@
+{% extends 'website/basepage.html' %}
+
+{% block title %}
+Participants
+{% endblock %}
+
+{% block content %}
+
+<style>
+
+.page-container {
+    padding: 25px;
+}
+
+.toolbar {
+    margin-bottom: 20px;
+}
+
+.open-btn {
+    background: #2563eb;
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.open-btn:hover {
+    background: #1d4ed8;
+}
+
+.participant-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
+
+.participant-table th {
+    background: #f3f4f6;
+    text-align: left;
+    padding: 12px;
+    border-bottom: 1px solid #ddd;
+}
+
+.participant-table td {
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+}
+
+.participant-table tr:hover {
+    background: #f9fafb;
+}
+
+</style>
+
+<div class="page-container">
+
+    <h1>Participants</h1>
+
+    <div class="toolbar">
+
+        <button
+            class="open-btn"
+            onclick="openParticipant()">
+            Open Participant
+        </button>
+
+    </div>
+
+    <!-- Participant Table 
+
+    <table class="participant-table">
+
+        <thead>
+            <tr>
+                <th></th>
+                <th>User</th>
+                <th>Title</th>
+                <th>Surname</th>
+                <th>First Name</th>
+                <th>Initials</th>
+                <th>Email Address</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+            <tr>
+                <td>
+                    <input
+                        type="radio"
+                        name="participant"
+                        value="34">
+                </td>
+                <td>user001</td>
+                <td>Mr</td>
+                <td>Smith</td>
+                <td>John</td>
+                <td>JS</td>
+                <td>john.smith@email.com</td>
+            </tr>
+
+            <tr>
+                <td>
+                    <input
+                        type="radio"
+                        name="participant"
+                        value="133">
+                </td>
+                <td>user002</td>
+                <td>Mrs</td>
+                <td>Brown</td>
+                <td>Sarah</td>
+                <td>SB</td>
+                <td>sarah@email.com</td>
+            </tr>
+
+            <tr>
+                <td>
+                    <input
+                        type="radio"
+                        name="participant"
+                        value="232">
+                </td>
+                <td>user003</td>
+                <td>Mr</td>
+                <td>Wilson</td>
+                <td>David</td>
+                <td>DW</td>
+                <td>david@email.com</td>
+            </tr>
+
+        </tbody>
+
+    </table>
+    -->
+    <table class="participant-table">
+
+        <thead>
+            <tr>
+                <th></th>
+                <th>User</th>
+                <th>Title</th>
+                <th>Surname</th>
+                <th>First Name</th>
+                <th>Initials</th>
+                <th>Email Address</th>
+            </tr>
+        </thead>
+
+        <tbody id="participantTableBody">
+
+        </tbody>
+
+    </table>
+
+</div>
+
+<script>
+
+function openParticipant() {
+
+    const selected =
+        document.querySelector(
+            'input[name="participant"]:checked'
+        );
+
+    if (!selected) {
+
+        alert(
+            'Please select a participant.'
+        );
+
+        return;
+    }
+
+    const participantId =
+        selected.value;
+
+    window.location.href =
+        '/participants/' +
+        participantId +
+        '/';
+}
+
+document.addEventListener(
+    'DOMContentLoaded',
+    loadParticipants
+);
+
+async function loadParticipants() {
+
+    try {
+
+        //const eventId = event_id;
+
+        const eventId = "{{ event_id }}";
+
+
+        const response = await fetch(
+            `/api/event_participants/${eventId}/`,
+            {
+                credentials: 'same-origin'
+            }
+        );
+
+        const participants =
+            await response.json();
+
+        const tbody =
+            document.getElementById(
+                'participantTableBody'
+            );
+
+        tbody.innerHTML = '';
+
+        participants.forEach(
+            participant => {
+
+                const row =
+                    document.createElement('tr');
+
+                row.innerHTML = `
+                    <td>
+                        <input
+                            type="radio"
+                            name="participant"
+                            value="${participant.id}">
+                    </td>
+
+                    <td>${participant.user}</td>
+                    <td>${participant.title}</td>
+                    <td>${participant.surname}</td>
+                    <td>${participant.firstname}</td>
+                    <td>${participant.initials}</td>
+                    <td>${participant.emailaddress}</td>
+                `;
+
+                tbody.appendChild(row);
+            }
+        );
+
+    }
+    catch(error) {
+
+        console.error(
+            'Failed to load participants',
+            error
+        );
+    }
+}
+
+</script>
+
+{% endblock %}

@@ -51,10 +51,46 @@ body {
     color: white;
 }
 
+/* Main Layout */
+.container-main {
+    display: flex;
+    height: calc(100vh - 60px);
+}
+
 .container {
     max-width: 1400px;
     margin: 20px auto;
     padding: 20px;
+}
+
+/* Left Navigation */
+.sidebar {
+    width: 250px;
+    background: #f4f4f4;
+    border-right: 1px solid #ddd;
+    padding-top: 20px;
+}
+
+.sidebar h3 {
+    padding: 0 20px 15px;
+    color: #333;
+}
+
+.sidebar a {
+    display: block;
+    padding: 12px 20px;
+    text-decoration: none;
+    color: #444;
+    transition: background 0.3s;
+}
+
+.sidebar a:hover {
+    background: #e5e7eb;
+}
+
+.sidebar a.active {
+    background: #2563eb;
+    color: white;
 }
 
 .card {
@@ -98,6 +134,7 @@ body {
 
 .description {
     margin-top: 20px;
+    margin-bottom: 20px;
 }
 
 .description .value {
@@ -107,6 +144,16 @@ body {
 @media(max-width:768px) {
     .details-grid {
         grid-template-columns: 1fr;
+    }
+
+    .container-main {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid #ddd;
     }
 }
 
@@ -162,6 +209,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 30px;
+    margin-bottom: 30px;
 }
 
 .category-card {
@@ -190,32 +238,51 @@ body {
     border: 1px solid #ccc;
 }
 
-.subproduct-title {
+.subevent-image-section {
+    display: flex;
+    gap: 25px;
+    align-items: center;
+    margin-bottom: 25px;
+}
+
+.subevent-image {
+    width: 350px;
+    height: 180px;
+    object-fit: contain;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+}
+
+.subevent-title {
     margin-bottom: 15px;
 }
 
-.subproduct-grid {
+.subevent-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill,minmax(300px,1fr));
+    grid-template-columns: repeat(auto-fill,minmax(450px,1fr));
     gap: 20px;
+    padding: 20px;
 }
 
-.subproduct-card {
+.subevent-card {
     background: white;
     border: 1px solid #ddd;
     border-radius: 8px;
     padding: 15px;
+    width: 400px;
 }
 
-.subproduct-image {
+/*
+.subevent-image {
     width: 100%;
     height: 180px;
-    object-fit: cover;
+    object-fit: contain;
     border-radius: 6px;
     margin-bottom: 10px;
 }
+*/
 
-.subproduct-details p {
+.subevent-details p {
     margin: 8px 0;
 }
 
@@ -231,14 +298,51 @@ body {
     }
 }
 
+.upload-section{
+
+    margin-top:40px;
+
+    padding:20px;
+
+    background:#f8f9fa;
+
+    border:1px solid #ddd;
+
+    border-radius:8px;
+}
+
+.upload-section button{
+
+    padding:10px 20px;
+
+    background:#1976d2;
+
+    color:white;
+
+    border:none;
+
+    border-radius:5px;
+
+    cursor:pointer;
+}
+
+.upload-section button:hover{
+
+    background:#125ca1;
+}
+
 </style>
 </head>
 
 <body>
 
-<div class="header">
 
-    <h2>Event Details</h2>
+
+<div class="header">
+    <!-- Serializer data -->
+    {{ sub_events|json_script:"sub_events-data" }}
+
+    <h2>Start2Finish</h2>
 
     <div class="header-buttons">
 
@@ -246,7 +350,7 @@ body {
             ← Back
         </a>
 
-        <a href="/events/new-event/" class="btn btn-edit">
+        <a href="/events-edit/{{ event.id }}/" class="btn btn-edit">
             Edit Event
         </a>
 
@@ -254,348 +358,268 @@ body {
 
 </div>
 
-<div class="container">
 
-    <div class="card">
+<div class="container-main">
 
-        <h2 class="section-title">Event Information</h2>
+    <!-- Left Navigation -->
+    <aside class="sidebar">
+        <h3>Event details</h3>
 
-        <div class="details-grid">
+        <a href="#" class="active">Event information</a>
+        <a href="/event_participants/{{event.id}}/">Participants</a>
+        <a href="#">Payment References</a>
+        <a href="#">Sponsors</a>
+        <a href="#">More information</a>
+        <a href="index.html">← Back to Home</a>
+    </aside>
 
-            <div class="field">
-                <div class="label">Event ID</div>
-                <div class="value">{{ event.eventid }}</div>
-            </div>
+    <!-- Content -->
+    <main class="content">
+        <h1>Event information</h1>
+        <br>
 
-            <div class="field">
-                <div class="label">Event Name</div>
-                <div class="value">{{ event.eventname }}</div>
-            </div>
+        <div class="container">
 
-            <div class="field">
-                <div class="label">Event Start Date</div>
-                <div class="value">{{ event.eventdate }}</div>
-            </div>
+            <div class="card">
 
-            <div class="field">
-                <div class="label">Event End Date</div>
-                <div class="value">{{ event.eventenddate }}</div>
-            </div>
+                <h2 class="section-title">Event Information</h2>
 
-            <div class="field">
-                <div class="label">Event Status</div>
-                <div class="value">{{ event.eventstatus }}</div>
-            </div>
+                <div class="details-grid">
 
-            <div class="field">
-                <div class="label">Termination Status</div>
-                <div class="value">{{ event.terminationstatus }}</div>
-            </div>
+                    <div class="field">
+                        <div class="label">Event ID</div>
+                        <div class="value">{{ event.eventid }}</div>
+                    </div>
 
-            <div class="field">
-                <div class="label">Event Type</div>
-                <div class="value">{{ event.eventtype }}</div>
-            </div>
+                    <div class="field">
+                        <div class="label">Event Name</div>
+                        <div class="value">{{ event.eventname }}</div>
+                    </div>
 
-            <div class="field">
-                <div class="label">Event Category</div>
-                <div class="value">{{ event.eventcategory }}</div>
-            </div>
+                    <div class="field">
+                        <div class="label">Event Start Date</div>
+                        <div class="value">{{ event.eventdate }}</div>
+                    </div>
 
-        </div>
+                    <div class="field">
+                        <div class="label">Event End Date</div>
+                        <div class="value">{{ event.eventenddate }}</div>
+                    </div>
 
-        <br><br>
+                    <div class="field">
+                        <div class="label">Event Status</div>
+                        <div class="value">{{ event.eventstatus }}</div>
+                    </div>
 
-        <h2 class="section-title">Contact Person Information</h2>
+                    <div class="field">
+                        <div class="label">Termination Status</div>
+                        <div class="value">{{ event.terminationstatus }}</div>
+                    </div>
 
-        <div class="details-grid">
+                    <div class="field">
+                        <div class="label">Event Type</div>
+                        <div class="value">{{ event.eventtype }}</div>
+                    </div>
 
-            <div class="field">
-                <div class="label">First Name</div>
-                <div class="value">{{ event.contactpersonname }}</div>
-            </div>
-
-            <div class="field">
-                <div class="label">Surname</div>
-                <div class="value">{{ event.contactpersonsurname }}</div>
-            </div>
-
-            <div class="field">
-                <div class="label">Other Name</div>
-                <div class="value">{{ event.contactpersonothername }}</div>
-            </div>
-
-            <div class="field">
-                <div class="label">Email Address</div>
-                <div class="value">{{ event.contactpersonemailaddr }}</div>
-            </div>
-
-            <div class="field">
-                <div class="label">Phone Number</div>
-                <div class="value">{{ event.contactpersonphonenum }}</div>
-            </div>
-
-            <div class="field">
-                <div class="label">Citizenship</div>
-                <div class="value">{{ event.contactpersoncitizenship }}</div>
-            </div>
-
-            <div class="field">
-                <div class="label">Nationality</div>
-                <div class="value">{{ event.contactpersonnationality }}</div>
-            </div>
-
-        </div>
-
-        <br><br>
-
-        <h2 class="section-title">Address Information</h2>
-
-        <div class="details-grid">
-
-            <div class="field">
-                <div class="label">Province</div>
-                <div class="value">{{ event.contactpersonprovince }}</div>
-            </div>
-
-            <div class="field">
-                <div class="label">Country</div>
-                <div class="value">{{ event.contactpersoncountry }}</div>
-            </div>
-
-            <div class="field">
-                <div class="label">Address Type</div>
-                <div class="value">{{ event.contactpersonaddrtype }}</div>
-            </div>
-
-            <div class="field">
-                <div class="label">Address Line 1</div>
-                <div class="value">{{ event.contactpersonaddr1 }}</div>
-            </div>
-
-            <div class="field">
-                <div class="label">Address Line 2</div>
-                <div class="value">{{ event.contactpersonaddr2 }}</div>
-            </div>
-
-            <div class="field">
-                <div class="label">Address Line 3</div>
-                <div class="value">{{ event.contactpersonaddr3 }}</div>
-            </div>
-
-            <div class="field">
-                <div class="label">Address Line 4</div>
-                <div class="value">{{ event.contactpersonaddr4 }}</div>
-            </div>
-
-            <div class="field">
-                <div class="label">Postal Code</div>
-                <div class="value">{{ event.contactpersonaddrcode }}</div>
-            </div>
-
-        </div>
-
-        <br><br>
-
-        <h2 class="section-title">Location Information</h2>
-
-        <div class="details-grid">
-
-            <div class="field">
-                <div class="label">Start Point Latitude</div>
-                <div class="value">{{ event.startPointLat }}</div>
-            </div>
-
-            <div class="field">
-                <div class="label">Start Point Longitude</div>
-                <div class="value">{{ event.startPointLng }}</div>
-            </div>
-
-        </div>
-
-        <div class="description">
-
-            <h2 class="section-title">Event Description</h2>
-
-            <div class="value">
-                {{event.eventdescription}}
-            </div>
-
-        </div>
-
-        <h2 class="section-title">Event Image</h2>
-
-        <div class="image-section">
-
-            <div class="current-image">
-                <img
-                    id="eventImagePreview"    
-                    src="{{ event.eventimage_event.eventMainImg.url }}"
-                    alt="Event Image">
-            </div>
-
-            <div class="upload-section">
-
-                <label class="upload-label">
-                    Upload New Image
-                </label>
-
-                <input
-                    type="file"
-                    id="eventImage"
-                    accept="image/*">
-
-                <p class="upload-note">
-                    Supported formats: JPG, PNG, GIF
-                </p>
-
-            </div>
-
-        </div>
-
-        <!-- Event Categories -->
-
-        <h2 class="section-title">Event Categories</h2>
-
-        <div class="category-container">
-
-            <!-- Category 1 -->
-
-            <div class="category-card">
-
-                <div class="category-header">
-                    <h3>Running Events</h3>
-                </div>
-
-                <div class="category-image-section">
-
-                    <img
-                        src="https://via.placeholder.com/350x180?text=Running+Events"
-                        class="category-image"
-                        id="categoryImage1">
-
-                    <div>
-                        <input
-                            type="file"
-                            accept="image/*"
-                            onchange="previewCategoryImage(this, 'categoryImage1')">
+                    <div class="field">
+                        <div class="label">Event Category</div>
+                        <div class="value">{{ event.eventcategory }}</div>
                     </div>
 
                 </div>
 
-                <h4 class="subevent-title">
-                    Sub Events
-                </h4>
+                <br><br>
 
-                <div class="subevent-grid">
+                <h2 class="section-title">Contact Person Information</h2>
 
-                    <div class="subevent-card">
+                <div class="details-grid">
 
+                    <div class="field">
+                        <div class="label">First Name</div>
+                        <div class="value">{{ event.contactpersonname }}</div>
+                    </div>
+
+                    <div class="field">
+                        <div class="label">Surname</div>
+                        <div class="value">{{ event.contactpersonsurname }}</div>
+                    </div>
+
+                    <div class="field">
+                        <div class="label">Other Name</div>
+                        <div class="value">{{ event.contactpersonothername }}</div>
+                    </div>
+
+                    <div class="field">
+                        <div class="label">Email Address</div>
+                        <div class="value">{{ event.contactpersonemailaddr }}</div>
+                    </div>
+
+                    <div class="field">
+                        <div class="label">Phone Number</div>
+                        <div class="value">{{ event.contactpersonphonenum }}</div>
+                    </div>
+
+                    <div class="field">
+                        <div class="label">Citizenship</div>
+                        <div class="value">{{ event.contactpersoncitizenship }}</div>
+                    </div>
+
+                    <div class="field">
+                        <div class="label">Nationality</div>
+                        <div class="value">{{ event.contactpersonnationality }}</div>
+                    </div>
+
+                </div>
+
+                <br><br>
+
+                <h2 class="section-title">Address Information</h2>
+
+                <div class="details-grid">
+
+                    <div class="field">
+                        <div class="label">Province</div>
+                        <div class="value">{{ event.contactpersonprovince }}</div>
+                    </div>
+
+                    <div class="field">
+                        <div class="label">Country</div>
+                        <div class="value">{{ event.contactpersoncountry }}</div>
+                    </div>
+
+                    <div class="field">
+                        <div class="label">Address Type</div>
+                        <div class="value">{{ event.contactpersonaddrtype }}</div>
+                    </div>
+
+                    <div class="field">
+                        <div class="label">Address Line 1</div>
+                        <div class="value">{{ event.contactpersonaddr1 }}</div>
+                    </div>
+
+                    <div class="field">
+                        <div class="label">Address Line 2</div>
+                        <div class="value">{{ event.contactpersonaddr2 }}</div>
+                    </div>
+
+                    <div class="field">
+                        <div class="label">Address Line 3</div>
+                        <div class="value">{{ event.contactpersonaddr3 }}</div>
+                    </div>
+
+                    <div class="field">
+                        <div class="label">Address Line 4</div>
+                        <div class="value">{{ event.contactpersonaddr4 }}</div>
+                    </div>
+
+                    <div class="field">
+                        <div class="label">Postal Code</div>
+                        <div class="value">{{ event.contactpersonaddrcode }}</div>
+                    </div>
+
+                </div>
+
+                <br><br>
+
+                <h2 class="section-title">Location Information</h2>
+
+                <div class="details-grid">
+
+                    <div class="field">
+                        <div class="label">Start Point Latitude</div>
+                        <div class="value">{{ event.startPointLat }}</div>
+                    </div>
+
+                    <div class="field">
+                        <div class="label">Start Point Longitude</div>
+                        <div class="value">{{ event.startPointLng }}</div>
+                    </div>
+
+                </div>
+
+                <div class="description">
+
+                    <h2 class="section-title">Event Description</h2>
+
+                    <div class="value">
+                        {{event.eventdescription}}
+                    </div>
+
+                </div>
+
+                <h2 class="section-title">Event Image</h2>
+
+                <div class="image-section">
+
+                    <div class="current-image">
                         <img
-                            src="https://via.placeholder.com/250x150?text=10K+Marathon"
-                            class="subevent-image"
-                            id="subImage1">
-
-                        <input
-                            type="file"
-                            accept="image/*"
-                            onchange="previewCategoryImage(this,'subImage1')">
-
-                        <div class="subevent-details">
-                            <p><strong>Name:</strong> 10K Marathon</p>
-                            <p><strong>Date:</strong> 2026-08-10</p>
-                            <p><strong>Rate:</strong> 500</p>
-                            <p><strong>Currency:</strong> INR</p>
-                        </div>
-
+                            id="eventImagePreview"    
+                            src="{{ event.eventimage_event.eventMainImg.url }}"
+                            alt="Event Image">
                     </div>
 
-                    <div class="subevent-card">
+                    <div class="upload-section">
 
-                        <img
-                            src="https://via.placeholder.com/250x150?text=21K+Half+Marathon"
-                            class="subevent-image"
-                            id="subImage2">
+                        <label class="upload-label">
+                            Upload New Image
+                        </label>
 
                         <input
                             type="file"
-                            accept="image/*"
-                            onchange="previewCategoryImage(this,'subImage2')">
+                            id="eventImage"
+                            accept="image/*">
 
-                        <div class="subevent-details">
-                            <p><strong>Name:</strong> 21K Half Marathon</p>
-                            <p><strong>Date:</strong> 2026-08-10</p>
-                            <p><strong>Rate:</strong> 900</p>
-                            <p><strong>Currency:</strong> INR</p>
-                        </div>
+                        <p class="upload-note">
+                            Supported formats: JPG, PNG, GIF
+                        </p>
 
                     </div>
 
                 </div>
 
-            </div>
+                <!-- Event Categories -->
 
-            <!-- Category 2 -->
-
-            <div class="category-card">
-
-                <div class="category-header">
-                    <h3>Cycling Events</h3>
-                </div>
-
-                <div class="category-image-section">
-
-                    <img
-                        src="https://via.placeholder.com/350x180?text=Cycling+Events"
-                        class="category-image"
-                        id="categoryImage2">
-
-                    <div>
-                        <input
-                            type="file"
-                            accept="image/*"
-                            onchange="previewCategoryImage(this, 'categoryImage2')">
-                    </div>
-
-                </div>
-
-                <h4 class="subevent-title">
-                    Sub Events
-                </h4>
-
-                <div class="subevent-grid">
-
-                    <div class="subevent-card">
-
-                        <img
-                            src="https://via.placeholder.com/250x150?text=50K+Cycling"
-                            class="subevent-image"
-                            id="subImage3">
-
-                        <input
-                            type="file"
-                            accept="image/*"
-                            onchange="previewCategoryImage(this,'subImage3')">
-
-                        <div class="subevent-details">
-                            <p><strong>Name:</strong> 50K Cycling</p>
-                            <p><strong>Date:</strong> 2026-09-15</p>
-                            <p><strong>Rate:</strong> 1200</p>
-                            <p><strong>Currency:</strong> INR</p>
-                        </div>
+                <h2 class="section-title">Event Categories</h2>      
+                    <div class="category-container" id="subeventsgrid2">
+                        <!-- Sub Events for Cycling will be dynamically loaded here -->
 
                     </div>
 
-                </div>
+                <!-- Participants upload -->
 
+                <h2 class="section-title">Participants upload</h2>
+                    <div class="upload-section">
+
+                        <h2>Import particpants</h2>
+
+                        <p>
+                            Select an Excel (.xlsx or .xls) file to upload.
+                        </p>
+
+                        <form id="excelUploadForm">
+                            {% csrf_token %}
+                            <input
+                                type="file"
+                                id="excelFile"
+                                name="file"
+                                accept=".xlsx,.xls"
+                                required>
+
+                            <br><br>
+
+                            <button type="submit">
+                                Upload Excel
+                            </button>
+
+                        </form>
+
+                        <div id="uploadMessage"></div>
+
+                    </div>
             </div>
 
         </div>
-
-    </div>
-
-</div>
-
+    </main>
 <script>
     /*
     document
@@ -613,6 +637,12 @@ body {
         }
     });
     */
+
+    document.addEventListener(
+        'DOMContentLoaded',
+        loadSubEvents
+    );
+
     document
     .getElementById('eventImage')
     .addEventListener('change', async function() {
@@ -647,6 +677,201 @@ body {
             reader.readAsDataURL(input.files[0]);
         }
     }   
+
+    function subEvents() {
+        event.subEvents.forEach(subEvent => {
+            console.log('Sub Event Name:', subEvent.name);
+            console.log('Sub Event Date:', subEvent.date);
+            console.log('Sub Event Rate:', subEvent.rate);
+            console.log('Sub Event Currency:', subEvent.currency);
+        });
+    }
+
+    async function loadSubEvents() {
+
+        try {
+
+            const eventid =  event.id ;
+
+            const subeventurl = `/api/subevents_event/67/`
+
+            const subeventurl2 = `/api/subevents_event/{{event_id}}/`
+
+            console.log('Sub Event URL:', subeventurl2);
+
+            /*
+            const sub_events_data = JSON.parse(
+                document.getElementById("sub_events-data").textContent
+            );
+            */
+            /*
+            const response = await fetch(
+                subeventurl2,
+                {
+                    credentials: 'same-origin'
+                }
+            );
+            */
+            //const subevents = await response.json();
+
+            const subevents = JSON.parse(
+                document.getElementById(
+                    "sub_events-data"
+                ).textContent
+            );
+
+            const groupedSubevents = subevents.reduce((groups, subevent) => {
+
+                const category = subevent.category_name;
+
+                if (!groups[category]) {
+                    groups[category] = [];
+                }
+
+                groups[category].push(subevent);
+
+                return groups;
+
+            }, {});
+
+            const container =
+                document.getElementById(
+                    'subeventsgrid2'
+                );
+
+            container.className = 'category-container';
+            container.innerHTML = '';
+
+            /*
+            subevents.forEach(
+                subEvent => {
+                    console.log('Sub Event Name:', subEvent.name);
+                    console.log('Sub Event Date:', subEvent.eventsubdate);
+                    console.log('Sub Event Rate:', subEvent.regfees);
+                    console.log('Sub Event Currency:', subEvent.regfeescurrency);
+                }
+            )
+            */
+
+            //const categoryHeader = document.createElement('div');
+            //categoryHeader.className = 'category-container';
+            //categoryHeader.innerHTML = '' ;
+
+
+            for (const [category, subeventscategory] of Object.entries(groupedSubevents)) {
+
+            //groupedSubevents.forEach((subeventscategory, category) => {
+                
+                const categorycard = document.createElement('div');
+                categorycard.textContent = `Category: ${category}`;
+                categorycard.className = 'category-card';
+
+                categorycard.innerHTML = '' ;
+
+                const categoryhdr = document.createElement('div');
+                categoryhdr.className = 'category-header';
+                categoryhdr.innerHTML = `<h3>${category}</h3>`;
+
+                categorycard.appendChild(categoryhdr);                
+
+                const subeventgrid = document.createElement('div');
+                subeventgrid.textContent = `Category: ${category}`;
+                subeventgrid.className = 'subevent-grid';
+
+                subeventgrid.innerHTML = '' ;
+
+
+
+                
+
+                //const card =
+                //        document.createElement('div');
+
+                subeventscategory.forEach(subEvent => {
+
+                    const card =
+                        document.createElement('div');
+
+                    card.className =
+                        'subevent-card';
+
+                    card.innerHTML = `
+
+                        <img
+                            src="${subEvent.elevationImg}"
+                            class="subevent-image"
+                            id="subImage4">
+
+                        <input
+                            type="file"
+                            accept="image/*"
+                            onchange="previewCategoryImage(this,'subImage4')">
+
+                        <h3>
+                            ${subEvent.name}
+                        </h3>
+
+                        <div class="subevent-details">
+                            <p><strong>Name:</strong> ${subEvent.name}</p>
+                            <p><strong>Date:</strong> ${subEvent.eventsubdate}</p>
+                            <p><strong>Rate:</strong> ${subEvent.regfees}</p>
+                            <p><strong>Currency:</strong> ${subEvent.regfeescurrency}</p>
+                        </div>
+                    `;
+
+                    subeventgrid.appendChild(card);
+                });
+
+                categorycard.appendChild(subeventgrid);
+                container.appendChild(categorycard);
+
+                //container.appendChild(subeventgrid);
+            };
+
+            /*
+            subevents.forEach(
+                subEvent => {
+
+                    const card =
+                        document.createElement('div');
+
+                    card.className =
+                        'subevent-card';
+
+                    card.innerHTML = `
+
+                        <img
+                            src="${subEvent.elevationImg}"
+                            class="subevent-image"
+                            id="subImage4">
+
+                        <input
+                            type="file"
+                            accept="image/*"
+                            onchange="previewCategoryImage(this,'subImage4')">
+
+                        <h3>
+                            ${subEvent.name}
+                        </h3>
+
+                        <div class="subevent-details">
+                            <p><strong>Name:</strong> ${subEvent.name}</p>
+                            <p><strong>Date:</strong> ${subEvent.eventsubdate}</p>
+                            <p><strong>Rate:</strong> ${subEvent.regfees}</p>
+                            <p><strong>Currency:</strong> ${subEvent.regfeescurrency}</p>
+                        </div>
+                    `;
+
+                    container.appendChild(card);
+                }
+            );
+            */
+        }
+        catch(error) {
+
+            console.error(error);
+        }
+    }
 </script>
 
 <script>
@@ -659,5 +884,75 @@ body {
     imgElement.src = imageUrl;
 </script>
 
+<script>
+    document.getElementById("excelUploadForm").addEventListener(
+    "submit",
+        async function(event) {
+
+            event.preventDefault();
+
+            const file =
+                document.getElementById("excelFile").files[0];
+
+            if (!file) {
+
+                alert("Please select an Excel file.");
+
+                return;
+            }
+
+            const formData = new FormData();
+
+            formData.append("file", file);
+
+            try {
+
+                const csrfToken = document.querySelector(
+                    '[name=csrfmiddlewaretoken]'
+                ).value;
+
+                const response = await fetch(
+                    "/api/participants_import/",
+                    {
+                        method: "POST",
+                        body: formData,
+                        credentials: "same-origin",
+                        headers: {
+                        "X-CSRFToken": csrfToken
+                    }
+                    }
+                );
+
+                if (response.ok) {
+
+                    document.getElementById("uploadMessage").innerHTML =
+                        "<span style='color:green'>Upload successful.</span>";
+
+                } else {
+
+                    const error = await response.text();
+
+                    document.getElementById("uploadMessage").innerHTML =
+                        "<span style='color:red'>Upload failed: "
+                        + error +
+                        "</span>";
+                }
+
+            }
+            catch(ex){
+
+                document.getElementById("uploadMessage").innerHTML =
+                    "<span style='color:red'>"
+                    + ex.message +
+                    "</span>";
+            }
+
+        }
+    );
+</script>
+
+
+
 </body>
-</html>
+</html> 
+

@@ -21,6 +21,7 @@ router.register('eventnotifications' , views.EventNotificationViewSet)
 router.register('eventsponsors' , views.EventSponsorViewSet)
 router.register('appsponsors' , views.AppSponsorViewSet)
 router.register('eventinformation' , views.eventInfoViewSet)
+
 #router.register('eventdetails' , views.EventsDetailsView , basename='eventdetails')
 
 urlpatterns = [    
@@ -57,7 +58,13 @@ urlpatterns = [
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
+    path('subevents_event/<str:pk>/', views.getSubeventsEvent , name='api-getsubevents_events'),
+    path('event_participants/<str:pk>/', views.getEventsParticipant , name='api-getparticipants_event'),
+    
+    
     path('getavashyaka/', views.getPayfastConnectionDetails , name='api-getavashyaka'),
+    
+    path('participants_import/', views.ParticipantImportView.as_view(), name='participants-import-api'),
     
     #path('eventdetails/', views.EventDetailListCreate.as_view() , name='event-details-create'),
 

@@ -98,7 +98,7 @@ class ParticipantTable(models.Model):
     usrphonenum = models.CharField(max_length=50, null=True, blank=True)
     profilepic = models.ImageField(upload_to='images/profilepic/' , blank=True , null=True , storage=PrivateMediaStorage())
     events = models.ManyToManyField(EventDetailTable , blank=True, null=True)
-    authid = models.CharField(max_length=50, blank=False, null=False , unique=True)
+    authid = models.CharField(max_length=50, blank=False, null=False , unique=False)
 
     def __str__(self):
         return self.surname
@@ -133,7 +133,7 @@ class ParticipantEventTable(models.Model):
     participant = models.ForeignKey(ParticipantTable , on_delete=models.CASCADE , related_name='participantevent_participant')
     event = models.ForeignKey(EventDetailTable, on_delete=models.CASCADE  , related_name='participantevent_event')
     subevent = models.ForeignKey(EventSubDetailTable , on_delete=models.CASCADE, related_name='participantevent_subevent')  
-    paymref = models.ForeignKey(ParticipantPaymRefTable , on_delete=models.DO_NOTHING , related_name='participantevent_paymref')  
+    paymref = models.ForeignKey(ParticipantPaymRefTable , on_delete=models.DO_NOTHING , related_name='participantevent_paymref' , null=True , blank=True)  
     participantstatus = models.CharField(max_length=50 , null=True , blank=True)
     eventregdate = models.DateTimeField(max_length=50 , null=True , blank=True)
     created = models.DateTimeField(auto_now_add=True)
