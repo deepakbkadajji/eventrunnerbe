@@ -1,317 +1,147 @@
 {% extends 'website/basepage.html' %}
 
-{% block title %}
-Participants
-{% endblock %}
+{% block title %}Events{% endblock %}
 
 {% block content %}
 
-<style>
-    * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-    }
+<div class="layout-with-sidebar">
 
-    body {
-        font-family: Arial, sans-serif;
-        height: 100vh;
-    }
-
-    /* Top Header */
-    .header {
-        height: 60px;
-        background: #2563eb;
-        color: white;
-        display: flex;
-        align-items: center;
-        padding: 0 25px;
-        font-size: 24px;
-        font-weight: bold;
-    }
-
-    /* Main Layout */
-    .container {
-        display: flex;
-        height: calc(100vh - 60px);
-    }
-
-    /* Left Navigation */
-    .sidebar {
-        width: 250px;
-        background: #f4f4f4;
-        border-right: 1px solid #ddd;
-        padding-top: 20px;
-    }
-
-    .sidebar h3 {
-        padding: 0 20px 15px;
-        color: #333;
-    }
-
-    .sidebar a {
-        display: block;
-        padding: 12px 20px;
-        text-decoration: none;
-        color: #444;
-        transition: background 0.3s;
-    }
-
-    .sidebar a:hover {
-        background: #e5e7eb;
-    }
-
-    .sidebar a.active {
-        background: #2563eb;
-        color: white;
-    }
-
-    /* Content Area */
-    .content {
-        flex: 1;
-        padding: 30px;
-        background: #fafafa;
-        overflow-y: auto;
-    }
-
-    .event-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-        gap: 20px;
-    }
-
-    .card-container {
-        display: grid;
-
-        /* Creates as many columns as will fit */
-        grid-template-columns: repeat(
-            auto-fill,
-            minmax(300px, 1fr)
-        );
-
-        gap: 20px;
-
-        padding: 20px;
-    }
-
-    .event-card {
-        background: white;
-        border-radius: 8px;
-        padding: 20px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
-
-    .event-card h4 {
-        margin-bottom: 10px;
-    }
-
-    .event-card p {
-        color: #666;
-        margin-bottom: 15px;
-    }
-
-    .event-card button {
-        background: #2563eb;
-        color: white;
-        border: none;
-        padding: 10px 15px;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-
-    .event-card button:hover {
-        background: #1d4ed8;
-    }
-
-    .event-image {
-        width: 100%;
-        height: 200px;
-        object-fit: cover;
-        border-radius: 6px;
-        margin-bottom: 10px;
-    }   
-
-    @media(max-width:768px) {
-        .container {
-            flex-direction: column;
-        }
-
-        .sidebar {
-            width: 100%;
-            border-right: none;
-            border-bottom: 1px solid #ddd;
-        }
-    }
-</style>
-<style>
-    .add-event-btn {
-        background: #16a34a;
-        color: white;
-        border: none;
-        padding: 12px 20px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 14px;
-    }
-
-    .add-event-btn:hover {
-        background: #15803d;
-    }
-</style>
-<style>
-    .event-detail-btn {
-        background: #16a34a;
-        color: white;
-        border: none;
-        padding: 12px 20px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 14px;
-    }
-
-    .event-detail-btn:hover {
-        background: #15803d;
-    }
-</style>
-
-<div style="margin-bottom:20px;">
-    <a href="new-event">
-    <button class="add-event-btn">
-        + New Event
-    </button>
-</a>
-</div>
-
-<div class="container">
-
-    <!-- Left Navigation -->
-    <aside class="sidebar">
+    <aside class="app-sidebar">
         <h3>Events</h3>
-
-        <a href="#" class="active">All Events</a>
-        <a href="#">Upcoming</a>
-        <a href="#">Past</a>
-        <a href="#">Categories</a>
-        <a href="#">Subscriptions</a>
-        <a href="index.html">← Back to Home</a>
+        <a href="{% url 'events' %}?filter=upcoming" class="filter-link{% if active_filter == 'upcoming' %} active{% endif %}">Upcoming</a>
+        <a href="{% url 'events' %}?filter=past" class="filter-link{% if active_filter == 'past' %} active{% endif %}">Past</a>
+        <a href="{% url 'events' %}?filter=new-planning" class="filter-link{% if active_filter == 'new-planning' %} active{% endif %}">New &amp; Planning</a>
+        <a href="{% url 'events' %}?filter=all" class="filter-link{% if active_filter == 'all' %} active{% endif %}">All Events</a>
     </aside>
 
-    <!-- Content -->
     <main class="content">
-        <h1>Events</h1>
-        <br>
-
-        <div class="card-container" id="eventCards">                
-                <!--
-                    <a href="event-details">
-                        <button 
-                            class="event-detail-btn"
-                            onclick="openEvent(${event.id})">
-                            View Details
-                        </button>
-                    </a>
-                -->
-
+        <div class="content-header">
+            <div class="content-header-text">
+                <h1>{{ filter_title }}</h1>
+                <p>{{ filter_description }}</p>
+            </div>
+            <a href="{% url 'event_create' %}" class="add-event-btn">
+                <span class="add-event-btn-icon">+</span>
+                New Event
+            </a>
         </div>
+
+        {% if events %}
+        <div class="card-container" id="eventCards">
+            {% for event in events %}
+            <article class="event-card" data-event-id="{{ event.id }}">
+                <div class="event-image-wrap">
+                    <div class="image-placeholder" id="image-placeholder-{{ event.id }}">
+                        <div class="image-spinner"></div>
+                        <span>Loading image...</span>
+                    </div>
+                    <img
+                        class="event-image"
+                        id="event-image-{{ event.id }}"
+                        alt="{{ event.eventname }}"
+                        loading="lazy">
+                </div>
+
+                <h3>{{ event.eventname }}</h3>
+                <p><strong>Start date:</strong> {{ event.eventdate }} – {{ event.eventenddate }}</p>
+                <p><strong>Status:</strong> {{ event.get_eventstatus_display }}</p>
+                <p><strong>Type:</strong> {{ event.eventtype }}</p>
+                <p><strong>Contact:</strong> {{ event.contactpersonname }}{% if event.contactpersonemailaddr %} ({{ event.contactpersonemailaddr }}){% endif %}</p>
+
+                <button type="button" class="event-detail-btn" onclick="openEvent({{ event.id }})">
+                    View Details
+                </button>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-state">No events found.</p>
+        {% endif %}
     </main>
 
 </div>
 
 <script>
+function openEvent(id) {
+    window.location.href = `/events/${id}/`;
+}
 
-document.addEventListener(
-    'DOMContentLoaded',
-    loadEvents
-);
+function showNoImage(eventId) {
+    const placeholder = document.getElementById(`image-placeholder-${eventId}`);
+    const img = document.getElementById(`event-image-${eventId}`);
+    if (!placeholder) return;
+    placeholder.classList.remove('hidden');
+    placeholder.classList.add('no-image');
+    placeholder.innerHTML = '<span>No image</span>';
+    if (img) img.remove();
+}
 
-async function loadEvents() {
+async function loadEventImage(eventId) {
+    const placeholder = document.getElementById(`image-placeholder-${eventId}`);
+    const img = document.getElementById(`event-image-${eventId}`);
+    if (!placeholder || !img || img.dataset.loaded === 'true') {
+        return;
+    }
+    img.dataset.loaded = 'true';
 
     try {
+        const response = await fetch(`/api/events/images/${eventId}/`, {
+            credentials: 'same-origin',
+        });
 
-        const response = await fetch(
-            '/api/events/',
-            {
-                credentials: 'same-origin'
-            }
-        );
+        if (!response.ok) {
+            showNoImage(eventId);
+            return;
+        }
 
-        const events =
-            await response.json();
+        const images = await response.json();
+        const imageUrl = images.length ? images[0].eventMainImg : null;
 
-        const container =
-            document.getElementById(
-                'eventCards'
-            );
+        if (!imageUrl) {
+            showNoImage(eventId);
+            return;
+        }
 
-        container.innerHTML = '';
-
-        events.forEach(
-            event => {
-
-                const card =
-                    document.createElement('div');
-
-                card.className =
-                    'event-card';
-
-                card.innerHTML = `
-
-                    <img
-                        src="${event.eventimage.eventMainImg}"
-                        alt="${event.eventname}"
-                        class="event-image">
-
-                    <h3>
-                        ${event.eventname}
-                    </h3>
-
-
-
-                    <p>
-                        <strong>Start date:</strong>
-                        ${event.eventdate} - ${event.eventenddate} 
-                    </p>
-
-                    <p>
-                        <strong>Status:</strong>
-                        ${event.eventstatus}
-                    </p>
-
-                    <p>
-                        <strong>Type:</strong>
-                        ${event.eventtype}
-                    </p>
-
-                    <p>
-                        <strong>Contact:</strong>
-                        ${event.contactpersonname} (${event.contactpersonemailaddr})
-                    </p>                    
-
-                    <button 
-                        class="event-detail-btn"
-                        onclick="openEvent(${event.id})">
-                        View Details
-                    </button>
-                `;
-
-                container.appendChild(card);
-            }
-        );
-
-    }
-    catch(error) {
-
-        console.error(error);
+        img.onload = function() {
+            img.classList.add('loaded');
+            placeholder.classList.add('hidden');
+        };
+        img.onerror = function() {
+            showNoImage(eventId);
+        };
+        img.src = imageUrl;
+    } catch (error) {
+        console.error('Failed to load image for event', eventId, error);
+        placeholder.classList.add('no-image');
+        placeholder.innerHTML = '<span>Image unavailable</span>';
     }
 }
 
-function openEvent(id) {
+function initLazyEventImages() {
+    const cards = document.querySelectorAll('.event-card[data-event-id]');
+    if (!cards.length) {
+        return;
+    }
 
-    window.location.href =
-        `/events/${id}/`;
+    if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver((entries, obs) => {
+            entries.forEach(entry => {
+                if (!entry.isIntersecting) {
+                    return;
+                }
+                const eventId = entry.target.dataset.eventId;
+                loadEventImage(eventId);
+                obs.unobserve(entry.target);
+            });
+        }, { rootMargin: '100px' });
+
+        cards.forEach(card => observer.observe(card));
+    } else {
+        cards.forEach(card => loadEventImage(card.dataset.eventId));
+    }
 }
 
+document.addEventListener('DOMContentLoaded', initLazyEventImages);
 </script>
-
 
 {% endblock %}

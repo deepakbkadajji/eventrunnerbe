@@ -1,0 +1,491 @@
+{% extends 'website/basepage.html' %}
+
+{% block title %}
+{{ organisation.name }} - Athletic Organisation Details
+{% endblock %}
+
+{% block content %}
+
+
+<div class="container">
+
+    <a href="{% url 'athletic_organisations' %}" class="back-btn">← Back to Athletic Organisations</a>
+
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li class="{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if organisation.banner %}
+    <img src="{{ organisation.banner.url }}" alt="{{ organisation.name }} banner" class="organisation-banner">
+    {% endif %}
+
+    <div class="card">
+        <h2 class="section-title">Organisation Overview</h2>
+
+        <span class="type-badge">{{ organisation.get_organisationtype_display }}</span>
+
+        {% if organisation.logo %}
+        <img src="{{ organisation.logo.url }}" alt="{{ organisation.name }} logo" class="organisation-logo">
+        {% endif %}
+
+        <div class="details-grid">
+            <div class="field">
+                <div class="label">Code</div>
+                <div class="value">{{ organisation.code }}</div>
+            </div>
+            <div class="field">
+                <div class="label">Name</div>
+                <div class="value">{{ organisation.name }}</div>
+            </div>
+            <div class="field">
+                <div class="label">Hierarchy Level</div>
+                <div class="value">Level {{ organisation.depth }}{% if parent %} — Parent: {{ parent.name }}{% endif %}</div>
+            </div>
+            <div class="field">
+                <div class="label">Registration Number</div>
+                <div class="value">{{ organisation.registrationnumber|default:"—" }}</div>
+            </div>
+            <div class="field">
+                <div class="label">Verified</div>
+                <div class="value">{% if organisation.isverified %}Yes{% else %}No{% endif %}</div>
+            </div>
+            <div class="field">
+                <div class="label">Active</div>
+                <div class="value">{% if organisation.isactive %}Yes{% else %}No{% endif %}</div>
+            </div>
+            <div class="field">
+                <div class="label">Created</div>
+                <div class="value">{{ organisation.created|date:"Y-m-d H:i" }}</div>
+            </div>
+            <div class="field">
+                <div class="label">Child Organisations</div>
+                <div class="value">{{ organisation.numchild }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2 class="section-title">Edit Organisation</h2>
+
+        <form method="post" enctype="multipart/form-data" class="add-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_organisation">
+
+            <div class="form-group">
+                <label for="code">Code</label>
+                <input type="text" id="code" name="code" value="{{ organisation.code }}" required>
+            </div>
+
+            <div class="form-group">
+                <label for="name">Name</label>
+                <input type="text" id="name" name="name" value="{{ organisation.name }}" required>
+            </div>
+
+            <div class="form-group">
+                <label for="organisationtype">Organisation Type</label>
+                <select id="organisationtype" name="organisationtype" required>
+                    {% for value, label in organisation_types %}
+                    <option value="{{ value }}"{% if organisation.organisationtype == value %} selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="registrationnumber">Registration Number</label>
+                <input type="text" id="registrationnumber" name="registrationnumber" value="{{ organisation.registrationnumber|default:'' }}">
+            </div>
+
+            <div class="form-group">
+                <label for="countrycode">Country Code</label>
+                <input type="text" id="countrycode" name="countrycode" value="{{ organisation.countrycode|default:'' }}">
+            </div>
+
+            <div class="form-group">
+                <label for="province">Province</label>
+                <input type="text" id="province" name="province" value="{{ organisation.province|default:'' }}">
+            </div>
+
+            <div class="form-group">
+                <label for="postcode">Postcode</label>
+                <input type="text" id="postcode" name="postcode" value="{{ organisation.postcode|default:'' }}">
+            </div>
+
+            <div class="form-group">
+                <label for="city">City</label>
+                <input type="text" id="city" name="city" value="{{ organisation.city|default:'' }}">
+            </div>
+
+            <div class="form-group">
+                <label for="contactname">Contact Name</label>
+                <input type="text" id="contactname" name="contactname" value="{{ organisation.contactname|default:'' }}">
+            </div>
+
+            <div class="form-group">
+                <label for="contactsurname">Contact Surname</label>
+                <input type="text" id="contactsurname" name="contactsurname" value="{{ organisation.contactsurname|default:'' }}">
+            </div>
+
+            <div class="form-group">
+                <label for="contactemail">Contact Email</label>
+                <input type="email" id="contactemail" name="contactemail" value="{{ organisation.contactemail|default:'' }}">
+            </div>
+
+            <div class="form-group">
+                <label for="contactphone">Contact Phone</label>
+                <input type="text" id="contactphone" name="contactphone" value="{{ organisation.contactphone|default:'' }}">
+            </div>
+
+            <div class="form-group">
+                <label for="websiteurl">Website URL</label>
+                <input type="text" id="websiteurl" name="websiteurl" value="{{ organisation.websiteurl|default:'' }}">
+            </div>
+
+            <div class="form-group">
+                <label for="lat">Latitude</label>
+                <input type="text" id="lat" name="lat" value="{{ organisation.lat|default:'' }}">
+            </div>
+
+            <div class="form-group">
+                <label for="lng">Longitude</label>
+                <input type="text" id="lng" name="lng" value="{{ organisation.lng|default:'' }}">
+            </div>
+
+            <div class="form-group">
+                <label for="isverified">Verified</label>
+                <select id="isverified" name="isverified">
+                    <option value="true"{% if organisation.isverified %} selected{% endif %}>Yes</option>
+                    <option value="false"{% if not organisation.isverified %} selected{% endif %}>No</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="isactive">Active</label>
+                <select id="isactive" name="isactive">
+                    <option value="true"{% if organisation.isactive %} selected{% endif %}>Yes</option>
+                    <option value="false"{% if not organisation.isactive %} selected{% endif %}>No</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="logo">Logo</label>
+                <input type="file" id="logo" name="logo" accept="image/*">
+            </div>
+
+            <div class="form-group">
+                <label for="banner">Banner</label>
+                <input type="file" id="banner" name="banner" accept="image/*">
+            </div>
+
+            <div class="form-group" style="min-width:100%;">
+                <label for="physicaladdress">Physical Address</label>
+                <textarea id="physicaladdress" name="physicaladdress">{{ organisation.physicaladdress|default:'' }}</textarea>
+            </div>
+
+            <button type="submit" class="btn-add">Save Changes</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="section-header">
+            <h2 class="section-title">Organisation Members</h2>
+        </div>
+
+        <form method="post" class="add-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_member">
+
+            <div class="form-group">
+                <label for="participant">Add Participant</label>
+                <select name="participant" id="participant" required>
+                    <option value="">Select participant...</option>
+                    {% for participant in available_participants %}
+                    <option value="{{ participant.id }}">
+                        {{ participant.firstname }} {{ participant.surname }}
+                        {% if participant.emailaddress %}({{ participant.emailaddress }}){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="membershipnumber">Membership Number</label>
+                <input type="text" name="membershipnumber" id="membershipnumber">
+            </div>
+
+            <div class="form-group">
+                <label for="membershiptype">Membership Type</label>
+                <input type="text" name="membershiptype" id="membershiptype">
+            </div>
+
+            <div class="form-group">
+                <label for="role">Role</label>
+                <select name="role" id="role">
+                    {% for value, label in member_roles %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="status">Status</label>
+                <select name="status" id="status">
+                    {% for value, label in member_statuses %}
+                    <option value="{{ value }}"{% if label == "Pending" %} selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="membershipstartdate">Start Date</label>
+                <input type="date" name="membershipstartdate" id="membershipstartdate">
+            </div>
+
+            <div class="form-group">
+                <label for="membershipenddate">End Date</label>
+                <input type="date" name="membershipenddate" id="membershipenddate">
+            </div>
+
+            <div class="form-group checkbox-group">
+                <input type="checkbox" name="isprimary" id="isprimary" value="true">
+                <label for="isprimary">Primary membership</label>
+            </div>
+
+            <button type="submit" class="btn-add"{% if not available_participants %} disabled{% endif %}>Add Member</button>
+        </form>
+
+        {% if not available_participants %}
+        <p class="empty-message">All participants are already members of this organisation.</p>
+        {% endif %}
+
+        {% if organisation_members %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Participant</th>
+                    <th>Membership #</th>
+                    <th>Type</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Primary</th>
+                    <th>Period</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for member in organisation_members %}
+                <tr id="member-row-{{ member.id }}">
+                    <td>
+                        {{ member.participant.firstname }} {{ member.participant.surname }}
+                        <br><small>{{ member.participant.emailaddress|default:"" }}</small>
+                    </td>
+                    <td>{{ member.membershipnumber|default:"—" }}</td>
+                    <td>{{ member.membershiptype|default:"—" }}</td>
+                    <td>{{ member.get_role_display }}</td>
+                    <td>{{ member.get_status_display }}</td>
+                    <td>{% if member.isprimary %}Yes{% else %}No{% endif %}</td>
+                    <td>
+                        {% if member.membershipstartdate %}{{ member.membershipstartdate|date:"Y-m-d" }}{% else %}—{% endif %}
+                        →
+                        {% if member.membershipenddate %}{{ member.membershipenddate|date:"Y-m-d" }}{% else %}—{% endif %}
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            <button type="button" class="btn-edit" onclick="toggleMemberEdit({{ member.id }})">Edit</button>
+                            <form method="post" style="display:inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="remove_member">
+                                <input type="hidden" name="member_id" value="{{ member.id }}">
+                                <button type="submit" class="btn-remove" onclick="return confirm('Remove this member?');">Remove</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                <tr id="member-edit-{{ member.id }}" class="edit-row">
+                    <td colspan="8">
+                        <form method="post" class="edit-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="edit_member">
+                            <input type="hidden" name="member_id" value="{{ member.id }}">
+
+                            <div class="form-group">
+                                <label>Membership Number</label>
+                                <input type="text" name="membershipnumber" value="{{ member.membershipnumber|default:'' }}">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Membership Type</label>
+                                <input type="text" name="membershiptype" value="{{ member.membershiptype|default:'' }}">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Role</label>
+                                <select name="role">
+                                    {% for value, label in member_roles %}
+                                    <option value="{{ value }}"{% if member.role == value %} selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Status</label>
+                                <select name="status">
+                                    {% for value, label in member_statuses %}
+                                    <option value="{{ value }}"{% if member.status == value %} selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Start Date</label>
+                                <input type="date" name="membershipstartdate" value="{{ member.membershipstartdate|date:'Y-m-d' }}">
+                            </div>
+
+                            <div class="form-group">
+                                <label>End Date</label>
+                                <input type="date" name="membershipenddate" value="{{ member.membershipenddate|date:'Y-m-d' }}">
+                            </div>
+
+                            <div class="form-group checkbox-group">
+                                <input type="checkbox" name="isprimary" value="true"{% if member.isprimary %} checked{% endif %}>
+                                <label>Primary membership</label>
+                            </div>
+
+                            <button type="submit" class="btn-add">Save</button>
+                            <button type="button" class="btn-cancel" onclick="toggleMemberEdit({{ member.id }})">Cancel</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty-message">No members linked to this organisation yet.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="section-header">
+            <h2 class="section-title">Athletics Categories</h2>
+        </div>
+
+        <form method="post" class="add-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_category">
+
+            <div class="form-group">
+                <label for="athleticscategory">Add Category</label>
+                <select name="athleticscategory" id="athleticscategory" required>
+                    <option value="">Select category...</option>
+                    {% for category in available_categories %}
+                    <option value="{{ category.id }}">{{ category.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group checkbox-group">
+                <input type="checkbox" name="isprimary" id="category-isprimary" value="true">
+                <label for="category-isprimary">Primary category</label>
+            </div>
+
+            <div class="form-group checkbox-group">
+                <input type="checkbox" name="isactive" id="category-isactive" value="true" checked>
+                <label for="category-isactive">Active</label>
+            </div>
+
+            <button type="submit" class="btn-add"{% if not available_categories %} disabled{% endif %}>Add Category</button>
+        </form>
+
+        {% if not available_categories %}
+        <p class="empty-message">All athletics categories are already linked to this organisation.</p>
+        {% endif %}
+
+        {% if organisation_categories %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Primary</th>
+                    <th>Active</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for category_link in organisation_categories %}
+                <tr id="category-row-{{ category_link.id }}">
+                    <td>{{ category_link.athleticscategory.name }}</td>
+                    <td>{% if category_link.isprimary %}Yes{% else %}No{% endif %}</td>
+                    <td>{% if category_link.isactive %}Yes{% else %}No{% endif %}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button type="button" class="btn-edit" onclick="toggleCategoryEdit({{ category_link.id }})">Edit</button>
+                            <form method="post" style="display:inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="remove_category">
+                                <input type="hidden" name="category_link_id" value="{{ category_link.id }}">
+                                <button type="submit" class="btn-remove" onclick="return confirm('Remove this category from the organisation?');">Remove</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                <tr id="category-edit-{{ category_link.id }}" class="edit-row">
+                    <td colspan="4">
+                        <form method="post" class="edit-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="edit_category">
+                            <input type="hidden" name="category_link_id" value="{{ category_link.id }}">
+
+                            <div class="form-group">
+                                <label>Category</label>
+                                <div class="value" style="margin:0;">{{ category_link.athleticscategory.name }}</div>
+                            </div>
+
+                            <div class="form-group checkbox-group">
+                                <input type="checkbox" name="isprimary" value="true"{% if category_link.isprimary %} checked{% endif %}>
+                                <label>Primary category</label>
+                            </div>
+
+                            <div class="form-group checkbox-group">
+                                <input type="checkbox" name="isactive" value="true"{% if category_link.isactive %} checked{% endif %}>
+                                <label>Active</label>
+                            </div>
+
+                            <button type="submit" class="btn-add">Save</button>
+                            <button type="button" class="btn-cancel" onclick="toggleCategoryEdit({{ category_link.id }})">Cancel</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty-message">No athletics categories linked to this organisation yet.</p>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+function toggleMemberEdit(memberId) {
+    const row = document.getElementById('member-edit-' + memberId);
+    const isActive = row.classList.contains('active');
+    document.querySelectorAll('.edit-row.active').forEach(item => item.classList.remove('active'));
+    if (!isActive) {
+        row.classList.add('active');
+    }
+}
+
+function toggleCategoryEdit(categoryId) {
+    const row = document.getElementById('category-edit-' + categoryId);
+    const isActive = row.classList.contains('active');
+    document.querySelectorAll('.edit-row.active').forEach(item => item.classList.remove('active'));
+    if (!isActive) {
+        row.classList.add('active');
+    }
+}
+</script>
+
+{% endblock %}

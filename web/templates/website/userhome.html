@@ -1,32 +1,20 @@
 {% extends 'website/basepage.html' %}
 
-{% block title %}
-Home
-{% endblock %}
+{% block title %}Home{% endblock %}
 
 {% block content %}
 
-    <!-- Bottom Pane -->
-<main class="content">
-    <div class="card">
-        <h1>Welcome</h1>
-        <p>
-            This is the content area. You can load data from your Django
-            REST API here using JavaScript and display it dynamically.
-        </p>
-
-        <p>
-            Example:
-        </p>
-
-        <pre>   
-    GET /api/customers/
-    GET /api/orders/
-    GET /api/products/
-        </pre>
+<main class="page-shell">
+    <div class="page-container">
+        <div class="card" style="max-width: 900px; margin: 0 auto;">
+            <h1 class="page-heading">Welcome</h1>
+            <p style="color: var(--muted); margin: 0;">
+                Use the links in the top navigation to manage events, organisations,
+                participants, and other records. Open the Administrator section in
+                the navigation for reference data and subscription management.
+            </p>
+        </div>
     </div>
 </main>
 
 {% endblock %}
-
-

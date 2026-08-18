@@ -26,7 +26,10 @@ urlpatterns = [
     path('', include('web.urls')),
 ]
 
-if settings.LOCAL_SERVE_STATIC_FILES:
+if settings.DEBUG:
+    from django.contrib.staticfiles.urls import staticfiles_urlpatterns
+    urlpatterns += staticfiles_urlpatterns()
+elif settings.LOCAL_SERVE_STATIC_FILES:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 if settings.LOCAL_SERVE_MEDIA_FILES:

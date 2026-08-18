@@ -1,0 +1,440 @@
+{% extends 'website/basepage.html' %}
+
+{% block title %}
+Athletic Associations
+{% endblock %}
+
+{% block content %}
+
+<style>
+    .page-container {
+        max-width: 1200px;
+        margin: 20px auto;
+        padding: 20px;
+    }
+
+    .card {
+        background: white;
+        padding: 25px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        margin-bottom: 25px;
+    }
+
+    .section-title {
+        margin-bottom: 20px;
+        color: #2563eb;
+        border-bottom: 2px solid #eee;
+        padding-bottom: 10px;
+    }
+
+    .messages {
+        list-style: none;
+        padding: 0;
+        margin-bottom: 20px;
+    }
+
+    .messages li {
+        padding: 12px 16px;
+        border-radius: 4px;
+        margin-bottom: 8px;
+    }
+
+    .messages .success {
+        background: #dcfce7;
+        color: #166534;
+        border: 1px solid #bbf7d0;
+    }
+
+    .messages .error {
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 12px;
+        align-items: end;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .form-group label {
+        font-weight: bold;
+        font-size: 13px;
+        color: #374151;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        padding: 8px 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        font-family: inherit;
+    }
+
+    .form-group textarea {
+        min-height: 70px;
+        resize: vertical;
+    }
+
+    .btn-add {
+        background: #16a34a;
+        color: white;
+        border: none;
+        padding: 10px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        height: fit-content;
+    }
+
+    .btn-add:hover {
+        background: #15803d;
+    }
+
+    .btn-edit,
+    .btn-child {
+        background: #2563eb;
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+    }
+
+    .btn-edit:hover,
+    .btn-child:hover {
+        background: #1d4ed8;
+    }
+
+    .btn-remove {
+        background: #dc2626;
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+    }
+
+    .btn-remove:hover {
+        background: #b91c1c;
+    }
+
+    .btn-cancel {
+        background: #6b7280;
+        color: white;
+        border: none;
+        padding: 8px 14px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .tree-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .tree-item {
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 14px 16px;
+        margin-bottom: 10px;
+        background: #fafafa;
+    }
+
+    .tree-item-header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
+    }
+
+    .tree-item-title {
+        font-size: 16px;
+        font-weight: bold;
+        color: #1e293b;
+        margin-bottom: 6px;
+    }
+
+    .tree-item-meta {
+        color: #64748b;
+        font-size: 14px;
+        margin-bottom: 4px;
+    }
+
+    .tree-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .edit-panel {
+        display: none;
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .edit-panel.active {
+        display: block;
+    }
+
+    .empty-message {
+        color: #666;
+        padding: 10px 0;
+    }
+
+    .depth-badge {
+        display: inline-block;
+        background: #dbeafe;
+        color: #1d4ed8;
+        font-size: 11px;
+        font-weight: bold;
+        padding: 2px 8px;
+        border-radius: 10px;
+        margin-right: 8px;
+    }
+
+    .tree-item[data-depth="1"] { margin-left: 0; }
+    .tree-item[data-depth="2"] { margin-left: 24px; }
+    .tree-item[data-depth="3"] { margin-left: 48px; }
+    .tree-item[data-depth="4"] { margin-left: 72px; }
+    .tree-item[data-depth="5"] { margin-left: 96px; }
+    .tree-item[data-depth="6"] { margin-left: 120px; }
+    .tree-item[data-depth="7"] { margin-left: 144px; }
+    .tree-item[data-depth="8"] { margin-left: 168px; }
+    .tree-item[data-depth="9"] { margin-left: 192px; }
+    .tree-item[data-depth="10"] { margin-left: 216px; }
+</style>
+
+<div class="page-container">
+
+    <h1>Athletic Associations</h1>
+
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li class="{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <div class="card">
+        <h2 class="section-title">Add Root Association</h2>
+
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_root">
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="root-name">Name</label>
+                    <input type="text" id="root-name" name="name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="root-registrationnumber">Registration Number</label>
+                    <input type="text" id="root-registrationnumber" name="registrationnumber">
+                </div>
+
+                <div class="form-group">
+                    <label for="root-athleticscategory">Athletics Category</label>
+                    <select id="root-athleticscategory" name="athleticscategory" required>
+                        <option value="">Select category...</option>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}">{{ category.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="root-description">Description</label>
+                    <textarea id="root-description" name="description"></textarea>
+                </div>
+
+                <button type="submit" class="btn-add"{% if not categories %} disabled{% endif %}>
+                    Add Root
+                </button>
+            </div>
+        </form>
+
+        {% if not categories %}
+        <p class="empty-message">Add athletics categories in admin before creating associations.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2 class="section-title">Association Hierarchy</h2>
+
+        {% if associations %}
+        <ul class="tree-list">
+            {% for association in associations %}
+            <li class="tree-item" data-depth="{{ association.depth }}">
+                <div class="tree-item-header">
+                    <div>
+                        <div class="tree-item-title">
+                            <span class="depth-badge">Level {{ association.depth }}</span>
+                            {{ association.name }}
+                        </div>
+                        <div class="tree-item-meta">
+                            <strong>Category:</strong> {{ association.athleticscategory.name }}
+                        </div>
+                        {% if association.registrationnumber %}
+                        <div class="tree-item-meta">
+                            <strong>Registration:</strong> {{ association.registrationnumber }}
+                        </div>
+                        {% endif %}
+                        {% if association.description %}
+                        <div class="tree-item-meta">
+                            <strong>Description:</strong> {{ association.description }}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="tree-actions">
+                        <button
+                            type="button"
+                            class="btn-child"
+                            onclick="togglePanel('child-{{ association.id }}')">
+                            Add Child
+                        </button>
+                        <button
+                            type="button"
+                            class="btn-edit"
+                            onclick="togglePanel('edit-{{ association.id }}')">
+                            Edit
+                        </button>
+                        <form method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="association_id" value="{{ association.id }}">
+                            <button
+                                type="submit"
+                                class="btn-remove"
+                                onclick="return confirm('Delete this association and all its children?');">
+                                Delete
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div id="child-{{ association.id }}" class="edit-panel">
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="add_child">
+                        <input type="hidden" name="parent_id" value="{{ association.id }}">
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Name</label>
+                                <input type="text" name="name" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Registration Number</label>
+                                <input type="text" name="registrationnumber">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Athletics Category</label>
+                                <div class="tree-item-meta" style="margin:0;padding:8px 10px;border:1px solid #d1d5db;border-radius:4px;background:#f9fafb;">
+                                    {{ association.athleticscategory.name }} (inherited from parent)
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Description</label>
+                                <textarea name="description"></textarea>
+                            </div>
+
+                            <button type="submit" class="btn-add">Save Child</button>
+                            <button type="button" class="btn-cancel" onclick="togglePanel('child-{{ association.id }}')">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <div id="edit-{{ association.id }}" class="edit-panel">
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="edit">
+                        <input type="hidden" name="association_id" value="{{ association.id }}">
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Name</label>
+                                <input type="text" name="name" value="{{ association.name }}" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Registration Number</label>
+                                <input type="text" name="registrationnumber" value="{{ association.registrationnumber|default:'' }}">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Athletics Category</label>
+                                {% if association.depth == 1 %}
+                                <select name="athleticscategory" required>
+                                    {% for category in categories %}
+                                    <option value="{{ category.id }}"{% if association.athleticscategory_id == category.id %} selected{% endif %}>
+                                        {{ category.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                {% else %}
+                                <div class="tree-item-meta" style="margin:0;padding:8px 10px;border:1px solid #d1d5db;border-radius:4px;background:#f9fafb;">
+                                    {{ association.athleticscategory.name }} (same as parent)
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="form-group">
+                                <label>Description</label>
+                                <textarea name="description">{{ association.description }}</textarea>
+                            </div>
+
+                            <button type="submit" class="btn-add">Save Changes</button>
+                            <button type="button" class="btn-cancel" onclick="togglePanel('edit-{{ association.id }}')">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="empty-message">No athletic associations yet. Add a root association above.</p>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+function togglePanel(panelId) {
+    const panel = document.getElementById(panelId);
+    const isActive = panel.classList.contains('active');
+
+    document.querySelectorAll('.edit-panel.active').forEach(item => {
+        item.classList.remove('active');
+    });
+
+    if (!isActive) {
+        panel.classList.add('active');
+    }
+}
+</script>
+
+{% endblock %}

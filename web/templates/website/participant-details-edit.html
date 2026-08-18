@@ -1,0 +1,151 @@
+{% extends 'website/basepage.html' %}
+
+{% block title %}Edit Participant{% endblock %}
+
+{% block content %}
+
+<div class="page-shell">
+<div class="page-container">
+
+    <div class="page-actions">
+        <a href="{% url 'participant_details' participant.id %}" class="back-btn">← Back to Details</a>
+    </div>
+
+    <div class="content-header">
+        <div class="content-header-text">
+            <h1>Edit Participant</h1>
+            <p>{{ participant.firstname|default:"" }} {{ participant.surname|default:"" }}</p>
+        </div>
+    </div>
+
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li class="{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <div class="card">
+            <h2 class="section-title">Account</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>User</label>
+                    <select name="user" required>
+                        <option value="">Select user...</option>
+                        {% for user in users %}
+                        <option value="{{ user.id }}"{% if participant.user_id == user.id %} selected{% endif %}>{{ user.username }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Auth ID</label>
+                    <input type="text" name="authid" value="{{ participant.authid|default:'' }}" maxlength="50" required>
+                </div>
+                <div class="form-group">
+                    <label>Profile Picture</label>
+                    <input type="file" name="profilepic" accept="image/*">
+                    {% if participant.profilepic %}
+                    <small style="color: var(--muted);">Current: {{ participant.profilepic.name }}</small>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="section-title">Personal Information</h2>
+            <div class="form-grid">
+                <div class="form-group"><label>Title</label><input type="text" name="title" value="{{ participant.title|default:'' }}" maxlength="10"></div>
+                <div class="form-group"><label>First Name</label><input type="text" name="firstname" value="{{ participant.firstname|default:'' }}" maxlength="50"></div>
+                <div class="form-group"><label>Surname</label><input type="text" name="surname" value="{{ participant.surname|default:'' }}" maxlength="50"></div>
+                <div class="form-group"><label>Other Names</label><input type="text" name="othernames" value="{{ participant.othernames|default:'' }}" maxlength="99"></div>
+                <div class="form-group"><label>Initials</label><input type="text" name="initials" value="{{ participant.initials|default:'' }}" maxlength="10"></div>
+                <div class="form-group"><label>Preferred Name</label><input type="text" name="preferredname" value="{{ participant.preferredname|default:'' }}" maxlength="50"></div>
+                <div class="form-group"><label>Maiden Name</label><input type="text" name="maidenname" value="{{ participant.maidenname|default:'' }}" maxlength="50"></div>
+                <div class="form-group">
+                    <label>Gender</label>
+                    <select name="gender">
+                        {% for value, label in genders %}
+                        <option value="{{ value }}"{% if participant.gender == value %} selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Date of Birth</label>
+                    <input type="date" name="dateOfBirth" value="{% if participant.dateOfBirth %}{{ participant.dateOfBirth|date:'Y-m-d' }}{% endif %}">
+                </div>
+                <div class="form-group"><label>Home Language</label><input type="text" name="homelanguage" value="{{ participant.homelanguage|default:'' }}" maxlength="50"></div>
+                <div class="form-group"><label>Preferred Language</label><input type="text" name="preferredlanguage" value="{{ participant.preferredlanguage|default:'' }}" maxlength="50"></div>
+                <div class="form-group"><label>Type</label><input type="text" name="typefld" value="{{ participant.typefld|default:'' }}" maxlength="50"></div>
+                <div class="form-group">
+                    <label><input type="checkbox" name="disabled"{% if participant.disabled %} checked{% endif %}> Disabled</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="section-title">Identity &amp; Documentation</h2>
+            <div class="form-grid">
+                <div class="form-group"><label>Identity Number</label><input type="text" name="identitynumber" value="{{ participant.identitynumber|default:'' }}" maxlength="30"></div>
+                <div class="form-group"><label>Passport Number</label><input type="text" name="passportnumber" value="{{ participant.passportnumber|default:'' }}" maxlength="30"></div>
+                <div class="form-group"><label>Nationality Code</label><input type="text" name="nationalitycode" value="{{ participant.nationalitycode|default:'' }}" maxlength="3"></div>
+                <div class="form-group"><label>Country of Issue</label><input type="text" name="countryofissue" value="{{ participant.countryofissue|default:'' }}" maxlength="50"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="section-title">Contact</h2>
+            <div class="form-grid">
+                <div class="form-group"><label>Email Address</label><input type="email" name="emailaddress" value="{{ participant.emailaddress|default:'' }}" maxlength="50" required></div>
+                <div class="form-group"><label>Phone Number</label><input type="text" name="usrphonenum" value="{{ participant.usrphonenum|default:'' }}" maxlength="50"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="section-title">Emergency Contact</h2>
+            <div class="form-grid">
+                <div class="form-group"><label>Contact Name</label><input type="text" name="emergencycontactname" value="{{ participant.emergencycontactname|default:'' }}" maxlength="150"></div>
+                <div class="form-group"><label>Contact Phone</label><input type="text" name="emergencycontactphone" value="{{ participant.emergencycontactphone|default:'' }}" maxlength="50"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="section-title">Account Status</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label><input type="checkbox" name="isverified"{% if participant.isverified %} checked{% endif %}> Verified</label>
+                </div>
+                <div class="form-group">
+                    <label><input type="checkbox" name="isactive"{% if participant.isactive %} checked{% endif %}> Active</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="section-title">Linked Events</h2>
+            <div class="form-group full-width">
+                <label>Events</label>
+                <select name="events" multiple size="8" style="width: 100%; min-height: 160px;">
+                    {% for event in events %}
+                    <option value="{{ event.id }}"{% if event.id in selected_event_ids %} selected{% endif %}>
+                        {{ event.eventname }} ({{ event.eventid }})
+                    </option>
+                    {% endfor %}
+                </select>
+                <small style="color: var(--muted);">Hold Ctrl (Windows) or Cmd (Mac) to select multiple events.</small>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <button type="submit" class="btn-add">Save Participant</button>
+            <a href="{% url 'participant_details' participant.id %}" class="back-btn">Cancel</a>
+        </div>
+    </form>
+
+</div>
+</div>
+
+{% endblock %}

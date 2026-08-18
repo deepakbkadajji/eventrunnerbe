@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+    <title>Create Event</title>
+
+    <style>
+
+        *{
+            box-sizing:border-box;
+            font-family:Arial,Helvetica,sans-serif;
+        }
+
+        body{
+            margin:0;
+            background:#f4f6f9;
+        }
+
+        .container{
+            width:95%;
+            max-width:1400px;
+            margin:auto;
+            padding:25px;
+        }
+
+        h1{
+            color:#1976d2;
+        }
+
+        .section{
+
+            background:white;
+
+            padding:20px;
+
+            margin-bottom:25px;
+
+            border-radius:8px;
+
+            box-shadow:0 2px 8px rgba(0,0,0,.1);
+        }
+
+        .section h2{
+
+            margin-top:0;
+
+            border-bottom:1px solid #ddd;
+
+            padding-bottom:10px;
+        }
+
+        .grid{
+
+            display:grid;
+
+            grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+
+            gap:15px;
+        }
+
+        .field{
+
+            display:flex;
+
+            flex-direction:column;
+        }
+
+        label{
+
+            font-weight:bold;
+
+            margin-bottom:5px;
+        }
+
+        input,
+        select,
+        textarea{
+
+            padding:10px;
+
+            border:1px solid #ccc;
+
+            border-radius:5px;
+        }
+
+        textarea{
+
+            min-height:120px;
+
+            resize:vertical;
+        }
+
+        .category{
+
+            border:1px solid #ccc;
+
+            margin-top:20px;
+
+            padding:20px;
+
+            border-radius:8px;
+
+            background:#fafafa;
+        }
+
+        .subEvent{
+
+            margin-top:20px;
+
+            border-left:5px solid #1976d2;
+
+            background:white;
+
+            padding:15px;
+        }
+
+        button{
+
+            padding:12px 25px;
+
+            background:#1976d2;
+
+            color:white;
+
+            border:none;
+
+            border-radius:5px;
+
+            cursor:pointer;
+        }
+
+        button:hover{
+
+            background:#125ca1;
+        }
+
+        img{
+
+            width:150px;
+
+            height:150px;
+
+            object-fit:cover;
+
+            border-radius:5px;
+
+            border:1px solid #ccc;
+
+            margin-top:10px;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+    <div class="container">
+        {% if event %}
+            {{ event|json_script:"event-data" }}
+            {{ sub_events|json_script:"sub_events-data" }}
+        {% endif %}
+        <h1>Create Event</h1>
+
+        <form id="eventForm">
+            {% csrf_token %}
+            <div class="section">
+
+                <h2>Event Information</h2>
+
+                <div class="grid">
+
+                    <div class="field">
+                        <label>Event ID</label>
+                        <input type="text" id="eventid">
+                    </div>
+
+                    <div class="field">
+                        <label>Event Name</label>
+                        <input type="text" id="eventname">
+                    </div>
+
+                    <div class="field">
+                        <label>Event Date</label>
+                        <input type="date" id="eventdate">
+                    </div>
+
+                    <div class="field">
+                        <label>Event End Date</label>
+                        <input type="date" id="eventenddate">
+                    </div>
+
+                    <div class="field">
+                        <label>Status</label>
+                        <input type="text" id="eventstatus">
+                    </div>
+
+                    <div class="field">
+                        <label>Event Type</label>
+                        <input type="text" id="eventtype">
+                    </div>
+
+                    <div class="field">
+                        <label>Event Category</label>
+                        <input type="text" id="eventcategory">
+                    </div>
+
+                    <div class="field">
+                        <label>Termination Status</label>
+                        <input type="text" id="terminationstatus">
+                    </div>
+
+                    <div class="field">
+                        <label>Start Latitude</label>
+                        <input type="number" step="any" id="startPointLat">
+                    </div>
+
+                    <div class="field">
+                        <label>Start Longitude</label>
+                        <input type="number" step="any" id="startPointLng">
+                    </div>
+
+                </div>
+
+                <br>
+
+                <label>Description</label>
+
+                <textarea id="eventdescription"></textarea>
+
+                <br><br>
+
+                <label>Event Image</label>
+
+                <input type="file" id="eventImage" accept="image/*">
+
+            </div>
+
+
+            <div class="section">
+
+                <h2>Contact Person</h2>
+
+                <div class="grid">
+
+                    <div class="field">
+                        <label>Name</label>
+                        <input type="text" id="contactpersonname">
+                    </div>
+
+                    <div class="field">
+                        <label>Surname</label>
+                        <input type="text" id="contactpersonsurname">
+                    </div>
+
+                    <div class="field">
+                        <label>Other Name</label>
+                        <input type="text" id="contactpersonothername">
+                    </div>
+
+                    <div class="field">
+                        <label>Email</label>
+                        <input type="email" id="contactpersonemailaddr">
+                    </div>
+
+                    <div class="field">
+                        <label>Phone</label>
+                        <input type="text" id="contactpersonphonenum">
+                    </div>
+
+                    <div class="field">
+                        <label>Citizenship</label>
+                        <input type="text" id="contactpersoncitizenship">
+                    </div>
+
+                    <div class="field">
+                        <label>Nationality</label>
+                        <input type="text" id="contactpersonnationality">
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="section">
+
+                <h2>Address</h2>
+
+                <div class="grid">
+
+                    <div class="field">
+                        <label>Province</label>
+                        <input type="text" id="contactpersonprovince">
+                    </div>
+
+                    <div class="field">
+                        <label>Country</label>
+                        <input type="text" id="contactpersoncountry">
+                    </div>
+
+                    <div class="field">
+                        <label>Address Type</label>
+                        <input type="text" id="contactpersonaddrtype">
+                    </div>
+
+                    <div class="field">
+                        <label>Address 1</label>
+                        <input type="text" id="contactpersonaddr1">
+                    </div>
+
+                    <div class="field">
+                        <label>Address 2</label>
+                        <input type="text" id="contactpersonaddr2">
+                    </div>
+
+                    <div class="field">
+                        <label>Address 3</label>
+                        <input type="text" id="contactpersonaddr3">
+                    </div>
+
+                    <div class="field">
+                        <label>Address 4</label>
+                        <input type="text" id="contactpersonaddr4">
+                    </div>
+
+                    <div class="field">
+                        <label>Postal Code</label>
+                        <input type="text" id="contactpersonaddrcode">
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="section">
+
+                <h2>Event Categories</h2>
+
+                <button type="button" onclick="addCategory()">
+                    Add Category
+                </button>
+
+                <div id="categories"></div>
+
+            </div>
+
+            <br>
+
+            <button type="submit">
+
+                Save Event
+
+            </button>
+
+        </form>
+
+    </div>
+
+<script>
+
+let categoryNumber=0;
+
+function addCategory(){
+
+    categoryNumber++;
+
+    const category=document.createElement("div");
+
+    category.className="category";
+
+    category.innerHTML=`
+
+    <h3>Category ${categoryNumber}</h3>
+
+    <label>Category Name</label>
+
+    <input type="text">
+
+    <br><br>
+
+    <label>Category Image</label>
+
+    <input type="file" accept="image/*">
+
+    <br><br>
+
+    <button type="button" onclick="addSubEvent(this)">
+    Add Sub Event
+    </button>
+
+    <div class="subEvents"></div>
+
+    `;
+
+    document.getElementById("categories").appendChild(category);
+
+}
+
+function addSubEvent(button){
+
+    const container=
+    button.parentElement.querySelector(".subEvents");
+
+    const div=document.createElement("div");
+
+    div.className="subEvent";
+
+    div.innerHTML=`
+
+    <h4>Sub Event</h4>
+
+    <div class="grid">
+
+        <div class="field">
+            <label>Name</label>
+            <input type="text">
+        </div>
+
+        <div class="field">
+            <label>Date</label>
+            <input type="date">
+        </div>
+
+        <div class="field">
+            <label>Registration Fee</label>
+            <input type="number">
+        </div>
+
+        <div class="field">
+            <label>Currency</label>
+            <input type="text">
+        </div>
+
+        <div class="field">
+            <label>Image</label>
+            <input type="file" accept="image/*">
+        </div>
+
+    </div>
+
+    `;
+
+    container.appendChild(div);
+
+}
+
+document.getElementById("eventForm").addEventListener(
+"submit",
+function(e){
+
+    e.preventDefault();
+
+    //alert("Call your Django REST API here.");
+
+    saveEvent();
+
+});
+
+async function saveEvent() {
+
+    const event = {
+
+        eventid:
+            document.getElementById("eventid").value,
+
+        eventname:
+            document.getElementById("eventname").value,
+
+        eventdate:
+            document.getElementById("eventdate").value,
+
+        eventenddate:
+            document.getElementById("eventenddate").value,
+
+        eventstatus:
+            document.getElementById("eventstatus").value,
+
+        contactpersonname:
+            document.getElementById("contactpersonname").value,
+
+        contactpersonothername:
+            document.getElementById("contactpersonothername").value,
+
+        contactpersonsurname:
+            document.getElementById("contactpersonsurname").value,
+
+        contactpersonemailaddr:
+            document.getElementById("contactpersonemailaddr").value,
+
+        contactpersonphonenum:
+            document.getElementById("contactpersonphonenum").value,
+
+        contactpersoncitizenship:
+            document.getElementById("contactpersoncitizenship").value,
+
+        contactpersonnationality:
+            document.getElementById("contactpersonnationality").value,
+
+        contactpersonprovince:
+            document.getElementById("contactpersonprovince").value,
+
+        contactpersoncountry:
+            document.getElementById("contactpersoncountry").value,
+
+        contactpersonaddrtype:
+            document.getElementById("contactpersonaddrtype").value,
+
+        contactpersonaddr1:
+            document.getElementById("contactpersonaddr1").value,
+
+        contactpersonaddr2:
+            document.getElementById("contactpersonaddr2").value,
+
+        contactpersonaddr3:
+            document.getElementById("contactpersonaddr3").value,
+
+        contactpersonaddr4:
+            document.getElementById("contactpersonaddr4").value,
+
+        contactpersonaddrcode:
+            document.getElementById("contactpersonaddrcode").value,
+
+        terminationstatus:
+            document.getElementById("terminationstatus").value,
+
+        eventtype:
+            document.getElementById("eventtype").value,
+
+        eventcategory:
+            document.getElementById("eventcategory").value,
+
+        startPointLat:
+            document.getElementById("startPointLat").value,
+
+        startPointLng:
+            document.getElementById("startPointLng").value,
+
+        eventdescription:
+            document.getElementById("eventdescription").value,
+
+        categories: []
+    };
+
+    //
+    // Read Categories
+    //
+
+    document
+        .querySelectorAll(".category")
+        .forEach((categoryDiv, categoryIndex) => {
+
+        const category = {
+
+            categoryname:
+                categoryDiv
+                    .querySelector(".categoryName")
+                    .value,
+
+            imageName: "",
+
+            subEvents: []
+
+        };
+
+        const categoryImage =
+            categoryDiv
+                .querySelector(".categoryImage")
+                .files[0];
+
+        if(categoryImage){
+
+            category.imageName =
+                categoryImage.name;
+        }
+
+        //
+        // Read Sub Events
+        //
+
+        categoryDiv
+            .querySelectorAll(".subEvent")
+            .forEach(subDiv => {
+
+            const subEvent={
+
+                name:
+                    subDiv
+                    .querySelector(".subEventName")
+                    .value,
+
+                date:
+                    subDiv
+                    .querySelector(".subEventDate")
+                    .value,
+
+                registrationFee:
+                    subDiv
+                    .querySelector(".registrationFee")
+                    .value,
+
+                currency:
+                    subDiv
+                    .querySelector(".currency")
+                    .value,
+
+                imageName:""
+
+            };
+
+            const image =
+                subDiv
+                .querySelector(".subEventImage")
+                .files[0];
+
+            if(image){
+
+                subEvent.imageName =
+                    image.name;
+            }
+
+            category.subEvents.push(subEvent);
+
+        });
+
+        event.categories.push(category);
+
+    });
+
+    console.log(event);
+
+    uploadEvent(event);
+
+}
+
+async function uploadEvent(event){
+
+    const formData =
+        new FormData();
+
+    //
+    // Add JSON
+    //
+
+    formData.append(
+        "event",
+        JSON.stringify(event)
+    );
+
+    //
+    // Event Image
+    //
+
+    const eventImage =
+        document
+        .getElementById("eventImage")
+        .files[0];
+
+    if(eventImage){
+
+        formData.append(
+            "eventImage",
+            eventImage
+        );
+    }
+
+    //
+    // Category Images
+    //
+
+    document
+        .querySelectorAll(".category")
+        .forEach((category,index)=>{
+
+        const image =
+            category
+            .querySelector(".categoryImage")
+            .files[0];
+
+        if(image){
+
+            formData.append(
+                "categoryImage"+index,
+                image
+            );
+        }
+
+        category
+            .querySelectorAll(".subEvent")
+            .forEach((subEvent,subIndex)=>{
+
+            const subImage =
+                subEvent
+                .querySelector(".subEventImage")
+                .files[0];
+
+            if(subImage){
+
+                formData.append(
+                    "subImage"
+                    +index+"_"
+                    +subIndex,
+
+                    subImage
+                );
+
+            }
+
+        });
+
+    });
+
+    const csrf =
+        document.querySelector(
+        '[name=csrfmiddlewaretoken]'
+        ).value;
+
+    const response =
+        await fetch(
+        "/api/events/",
+        {
+
+            method:"POST",
+
+            body:formData,
+
+            credentials:"same-origin",
+
+            headers:{
+                "X-CSRFToken":csrf
+            }
+
+        });
+
+    const result =
+        await response.json();
+
+    console.log(result);
+
+}
+
+let eventdet = null;
+
+const eventElement = document.getElementById("event-data");
+
+if (eventElement) {
+    eventdet = JSON.parse(eventElement.textContent);
+}
+
+if (eventdet) {
+
+    document.getElementById("eventid").value =
+        eventdet.eventid;
+
+    document.getElementById("eventname").value =
+        eventdet.eventname;
+
+    document.getElementById("eventdate").value =
+        eventdet.eventdate;
+
+    document.getElementById("eventenddate").value =
+        eventdet.eventenddate;
+
+    document.getElementById("eventstatus").value =
+        eventdet.eventstatus;
+
+    document.getElementById("contactpersonname").value =
+        eventdet.contactpersonname;
+
+    document.getElementById("contactpersonsurname").value =
+        eventdet.contactpersonsurname;
+
+    document.getElementById("contactpersonothername").value =
+        eventdet.contactpersonothername;
+
+    document.getElementById("contactpersonemailaddr").value =
+        eventdet.contactpersonemailaddr;
+
+    document.getElementById("contactpersonphonenum").value =
+        eventdet.contactpersonphonenum;
+
+    document.getElementById("contactpersoncitizenship").value =
+        eventdet.contactpersoncitizenship;
+
+    document.getElementById("contactpersonnationality").value =
+        eventdet.contactpersonnationality;
+
+    document.getElementById("contactpersonprovince").value =
+        eventdet.contactpersonprovince;
+
+    document.getElementById("contactpersoncountry").value =
+        eventdet.contactpersoncountry;
+
+    document.getElementById("contactpersonaddrtype").value =
+        eventdet.contactpersonaddrtype;
+
+    document.getElementById("contactpersonaddr1").value =
+        eventdet.contactpersonaddr1;
+
+    document.getElementById("contactpersonaddr2").value =
+        eventdet.contactpersonaddr2;
+
+    document.getElementById("contactpersonaddr3").value =
+        eventdet.contactpersonaddr3;
+
+    document.getElementById("contactpersonaddr4").value =
+        eventdet.contactpersonaddr4;
+
+    document.getElementById("contactpersonaddrcode").value =
+        eventdet.contactpersonaddrcode;
+
+    document.getElementById("terminationstatus").value =
+        eventdet.terminationstatus;
+
+    document.getElementById("eventtype").value =
+        eventdet.eventtype;
+
+    document.getElementById("eventcategory").value =
+        eventdet.eventcategory;
+
+    document.getElementById("startPointLat").value =
+        eventdet.startPointLat;
+
+    document.getElementById("startPointLng").value =
+        eventdet.startPointLng;
+
+    document.getElementById("eventdescription").value =
+        eventdet.eventdescription;
+
+    // Populate categories, images, sub-events...
+
+}
+
+</script>
+
+</body>
+
+</html>

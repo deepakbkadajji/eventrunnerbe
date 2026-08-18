@@ -1,0 +1,29 @@
+<li class="org-tree-node">
+    <div class="org-tree-row">
+        {% if node.children %}
+        <button type="button" class="tree-toggle expanded" aria-label="Toggle children" onclick="toggleTreeNode(this)">
+            <span class="tree-toggle-icon">▼</span>
+        </button>
+        {% else %}
+        <span class="tree-toggle-spacer"></span>
+        {% endif %}
+
+        <div class="org-tree-label">
+            <span class="type-badge">{{ node.organisation.get_organisationtype_display }}</span>
+            <strong>{{ node.organisation.name }}</strong>
+            <span class="org-tree-code">({{ node.organisation.code }})</span>
+        </div>
+
+        <a href="{% url 'athletic_organisation_details' node.organisation.id %}" class="btn-tree-view">
+            View Details
+        </a>
+    </div>
+
+    {% if node.children %}
+    <ul class="org-tree-children">
+        {% for child in node.children %}
+        {% include "website/athletic-organisation-tree-node.html" with node=child %}
+        {% endfor %}
+    </ul>
+    {% endif %}
+</li>

@@ -1,86 +1,57 @@
+{% load static %}
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Start2Finish{% endblock %}</title>
-
-    <style>
-
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-        }
-
-        .logo {
-            font-size: 24px;
-            font-weight: bold;
-        }
-
-        .navbar {
-            background: #2563eb;
-            padding: 15px 30px;
-            display: flex;
-            justify-content: flex-end;
-            gap: 25px;
-            align-items: center;
-        }
-
-        .navbar a {
-            color: white;
-            text-decoration: none;
-        }
-
-        .current-page {
-            color: #dbeafe;
-            font-weight: bold;
-            cursor: default;
-        }
-
-        .logout-btn {
-            background: #dc2626;
-            color: white;
-            border: none;
-            padding: 8px 14px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-    </style>
+    <link rel="stylesheet" href="{% static 'website/css/app.css' %}">
+    {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body class="has-page-background" style="--page-background-image: url('{% static page_background_image %}');">
 
-<div class="navbar">
-    <div class="logo">Start 2 Finish</div>
+<nav class="app-navbar">
+    <div class="app-logo">Start 2 Finish</div>
 
-    {% if request.resolver_match.url_name == 'userhome' %}
-        <span class="current-page">Home</span>
-    {% else %}
-        <a href="{% url 'userhome' %}">Home</a>
-    {% endif %}
+    <div class="app-nav-links">
+        {% if request.resolver_match.url_name == 'userhome' %}
+            <span class="app-nav-link active">Home</span>
+        {% else %}
+            <a href="{% url 'userhome' %}" class="app-nav-link">Home</a>
+        {% endif %}
 
-    {% if request.resolver_match.url_name == 'events' %}
-        <span class="current-page">Events</span>
-    {% else %}
-        <a href="{% url 'events' %}">Events</a>
-    {% endif %}
+        {% if request.resolver_match.url_name == 'athletic_organisations' or request.resolver_match.url_name == 'athletic_organisation_details' %}
+            <span class="app-nav-link active">Athletic Organisations</span>
+        {% else %}
+            <a href="{% url 'athletic_organisations' %}" class="app-nav-link">Athletic Organisations</a>
+        {% endif %}
 
-    {% if request.resolver_match.url_name == 'participants' %}
-        <span class="current-page">Participants</span>
-    {% else %}
-        <a href="{% url 'participants' %}">Participants</a>
-    {% endif %}
+        {% if request.resolver_match.url_name == 'events' or request.resolver_match.url_name == 'event_create' %}
+            <span class="app-nav-link active">Events</span>
+        {% else %}
+            <a href="{% url 'events' %}" class="app-nav-link">Events</a>
+        {% endif %}
 
-    {% if user.is_authenticated %}
-    <form method="POST"
-          action="{% url 'logout' %}"
-          style="display:inline;">
-        {% csrf_token %}
-        <button type="submit" class="logout-btn">
-            Logout
-        </button>
-    </form>
-    {% endif %}
+        {% if request.resolver_match.url_name == 'participants' or request.resolver_match.url_name == 'participant_details' or request.resolver_match.url_name == 'participant_details_edit' %}
+            <span class="app-nav-link active">Participants</span>
+        {% else %}
+            <a href="{% url 'participants' %}" class="app-nav-link">Participants</a>
+        {% endif %}
 
-</div>
+        {% if request.resolver_match.url_name == 'administrator' %}
+            <span class="app-nav-link active">Administrator</span>
+        {% else %}
+            <a href="{% url 'administrator' %}" class="app-nav-link">Administration</a>
+        {% endif %}
+
+        {% if user.is_authenticated %}
+        <form method="POST" action="{% url 'logout' %}" style="display:inline; margin:0;">
+            {% csrf_token %}
+            <button type="submit" class="logout-btn">Logout</button>
+        </form>
+        {% endif %}
+    </div>
+</nav>
 
 {% block content %}
 {% endblock %}

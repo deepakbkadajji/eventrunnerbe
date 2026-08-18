@@ -21,17 +21,39 @@ router.register('eventnotifications' , views.EventNotificationViewSet)
 router.register('eventsponsors' , views.EventSponsorViewSet)
 router.register('appsponsors' , views.AppSponsorViewSet)
 router.register('eventinformation' , views.eventInfoViewSet)
+router.register('organisations' , views.OrganisationViewSet)
+router.register('organisationmembers' , views.OrganisationMemberViewSet)
+router.register('organisationevents' , views.OrganisationEventViewSet)
+router.register('athleticorganisations' , views.AthleticOrganisationViewSet)
+router.register('athleticorganisationmembers' , views.AthleticOrganisationMemberViewSet)
+router.register('athleticorganisationcategories' , views.AthleticOrganisationCategoryViewSet)
+router.register('errorreports', views.ErrorViewSet)
+router.register('appreleaseversions', views.AppReleaseVersionViewSet)
+router.register('termsandconditions', views.TermsAndConditionsViewSet)
 
 #router.register('eventdetails' , views.EventsDetailsView , basename='eventdetails')
 
-urlpatterns = [    
-    #path('api/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
-]
-
 urlpatterns = [
+    path(
+        'appreleaseversions/lookup/',
+        views.AppReleaseVersionViewSet.as_view({'post': 'lookup'}),
+        name='app-release-version-lookup',
+    ),
+    path(
+        'termsandconditions/current/',
+        views.TermsAndConditionsViewSet.as_view({'get': 'current'}),
+        name='terms-current',
+    ),
+    path('terms/current/', views.getCurrentTerms, name='terms-current-alias'),
+    path('terms/status/', views.getParticipantTermsStatus, name='terms-status'),
+    path('terms/accept/', views.acceptParticipantTerms, name='terms-accept'),
     path('', views.getRoutes , name='event-api-routes'),
     path('', include(router.urls) , name='event-api-eventimages'),
     path('events/', views.getEvents , name='event-api-events'),
+    path('events/list/', views.getEventsList , name='event-api-events-list'),
+    path('events/cards/registered-upcoming/', views.getParticipantRegisteredUpcomingEventCards, name='event-api-cards-registered-upcoming'),
+    path('events/cards/available-upcoming/', views.getParticipantAvailableUpcomingEventCards, name='event-api-cards-available-upcoming'),
+    path('events/cards/completed-past/', views.getParticipantCompletedPastEventCards, name='event-api-cards-completed-past'),
     path('events/create/', views.createEvent , name='event-api-createevent'),
     path('events/<str:pk>/update/', views.updateEvent , name='event-api-updateevent'),
     path('events/<str:pk>/delete/', views.deleteEvent , name='event-api-deleteevent'),
@@ -65,6 +87,13 @@ urlpatterns = [
     path('getavashyaka/', views.getPayfastConnectionDetails , name='api-getavashyaka'),
     
     path('participants_import/', views.ParticipantImportView.as_view(), name='participants-import-api'),
+
+    path('athleticorganisations/tree/', views.athleticOrganisationTree, name='athletic-organisation-tree'),
+    path('athleticorganisations/add_root/', views.athleticOrganisationAddRoot, name='athletic-organisation-add-root'),
+    path('athleticorganisations/add_child/', views.athleticOrganisationAddChild, name='athletic-organisation-add-child'),
+    path('athleticorganisations/move/', views.athleticOrganisationMove, name='athletic-organisation-move'),
+    path('athleticorganisations/update/', views.athleticOrganisationUpdateNode, name='athletic-organisation-update'),
+    path('athleticorganisations/delete/', views.athleticOrganisationDeleteNode, name='athletic-organisation-delete'),
     
     #path('eventdetails/', views.EventDetailListCreate.as_view() , name='event-details-create'),
 

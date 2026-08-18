@@ -1,0 +1,406 @@
+{% extends 'website/basepage.html' %}
+
+{% block title %}
+{{ organisation.name }} - Organisation Details
+{% endblock %}
+
+{% block content %}
+
+
+<div class="container">
+
+    <a href="{% url 'organisations' %}" class="back-btn">← Back to Organisations</a>
+
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li class="{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if organisation.banner %}
+    <img
+        src="{{ organisation.banner.url }}"
+        alt="{{ organisation.name }} banner"
+        class="organisation-banner">
+    {% endif %}
+
+    <div class="card">
+        <h2 class="section-title">Organisation Information</h2>
+
+        {% if organisation.logo %}
+        <img
+            src="{{ organisation.logo.url }}"
+            alt="{{ organisation.name }} logo"
+            class="organisation-logo">
+        {% endif %}
+
+        <div class="details-grid">
+            <div class="field">
+                <div class="label">Name</div>
+                <div class="value">{{ organisation.name }}</div>
+            </div>
+
+            <div class="field">
+                <div class="label">Contact Person</div>
+                <div class="value">{{ organisation.contactperson|default:"—" }}</div>
+            </div>
+
+            <div class="field">
+                <div class="label">Address 1</div>
+                <div class="value">{{ organisation.address1|default:"—" }}</div>
+            </div>
+
+            <div class="field">
+                <div class="label">Address 2</div>
+                <div class="value">{{ organisation.address2|default:"—" }}</div>
+            </div>
+
+            <div class="field">
+                <div class="label">Address 3</div>
+                <div class="value">{{ organisation.address3|default:"—" }}</div>
+            </div>
+
+            <div class="field">
+                <div class="label">Post Code</div>
+                <div class="value">{{ organisation.postcode|default:"—" }}</div>
+            </div>
+
+            <div class="field">
+                <div class="label">Province</div>
+                <div class="value">{{ organisation.province|default:"—" }}</div>
+            </div>
+
+            <div class="field">
+                <div class="label">Country</div>
+                <div class="value">{{ organisation.country|default:"—" }}</div>
+            </div>
+
+            <div class="field">
+                <div class="label">Latitude</div>
+                <div class="value">{{ organisation.lat|default:"—" }}</div>
+            </div>
+
+            <div class="field">
+                <div class="label">Longitude</div>
+                <div class="value">{{ organisation.lng|default:"—" }}</div>
+            </div>
+
+            <div class="field">
+                <div class="label">Website</div>
+                <div class="value">
+                    {% if organisation.website %}
+                    <a href="{{ organisation.website }}" target="_blank" rel="noopener noreferrer">
+                        {{ organisation.website }}
+                    </a>
+                    {% else %}
+                    —
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="field">
+                <div class="label">Email</div>
+                <div class="value">{{ organisation.email|default:"—" }}</div>
+            </div>
+
+            <div class="field">
+                <div class="label">Phone</div>
+                <div class="value">{{ organisation.phone|default:"—" }}</div>
+            </div>
+
+            <div class="field">
+                <div class="label">Created Date</div>
+                <div class="value">{{ organisation.created|date:"Y-m-d H:i" }}</div>
+            </div>
+
+            <div class="field">
+                <div class="label">Status</div>
+                <div class="value">{{ organisation.get_status_display }}</div>
+            </div>
+
+            <div class="field">
+                <div class="label">Athletic Association</div>
+                <div class="value">
+                    {% if organisation.athleticassociation %}
+                        {{ organisation.athleticassociation.name }}
+                        ({{ organisation.athleticassociation.athleticscategory.name }})
+                        {% if organisation.athleticassociation.registrationnumber %}
+                        — Reg: {{ organisation.athleticassociation.registrationnumber }}
+                        {% endif %}
+                    {% else %}
+                        —
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <form method="post" class="add-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_athletic_association">
+
+            <div class="form-group">
+                <label for="athleticassociation">Athletic Association</label>
+                <select name="athleticassociation" id="athleticassociation">
+                    <option value="">None</option>
+                    {% for association in athletic_associations %}
+                    <option value="{{ association.id }}"{% if organisation.athleticassociation_id == association.id %} selected{% endif %}>
+                        Level {{ association.depth }}: {{ association.name }} ({{ association.athleticscategory.name }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button type="submit" class="btn-add">Save Association</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="section-header">
+            <h2 class="section-title">Organisation Members</h2>
+        </div>
+
+        <form method="post" class="add-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_member">
+
+            <div class="form-group">
+                <label for="participant">Add Participant</label>
+                <select name="participant" id="participant" required>
+                    <option value="">Select participant...</option>
+                    {% for participant in available_participants %}
+                    <option value="{{ participant.id }}">
+                        {{ participant.firstname }} {{ participant.surname }}
+                        {% if participant.emailaddress %}({{ participant.emailaddress }}){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="role">Role</label>
+                <select name="role" id="role">
+                    {% for value, label in member_roles %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="status">Status</label>
+                <select name="status" id="status">
+                    {% for value, label in member_statuses %}
+                    <option value="{{ value }}"{% if label == "Pending" %} selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button type="submit" class="btn-add"{% if not available_participants %} disabled{% endif %}>
+                Add Member
+            </button>
+        </form>
+
+        {% if not available_participants %}
+        <p class="empty-message">All participants are already members of this organisation.</p>
+        {% endif %}
+
+        {% if organisation_members %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Participant</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Joined</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for member in organisation_members %}
+                <tr id="member-row-{{ member.id }}">
+                    <td>
+                        {{ member.participant.firstname }}
+                        {{ member.participant.surname }}
+                    </td>
+                    <td>{{ member.participant.emailaddress|default:"—" }}</td>
+                    <td>{{ member.participant.usrphonenum|default:"—" }}</td>
+                    <td>{{ member.get_role_display }}</td>
+                    <td>{{ member.get_status_display }}</td>
+                    <td>{{ member.created|date:"Y-m-d" }}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button
+                                type="button"
+                                class="btn-edit"
+                                onclick="toggleMemberEdit({{ member.id }})">
+                                Edit
+                            </button>
+                            <form method="post" style="display:inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="remove_member">
+                                <input type="hidden" name="member_id" value="{{ member.id }}">
+                                <button
+                                    type="submit"
+                                    class="btn-remove"
+                                    onclick="return confirm('Remove this member from the organisation?');">
+                                    Remove
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                <tr id="member-edit-{{ member.id }}" class="edit-row">
+                    <td colspan="7">
+                        <form method="post" class="edit-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="edit_member">
+                            <input type="hidden" name="member_id" value="{{ member.id }}">
+
+                            <div class="form-group">
+                                <label>Participant</label>
+                                <div class="value" style="margin:0;">
+                                    {{ member.participant.firstname }}
+                                    {{ member.participant.surname }}
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="edit-role-{{ member.id }}">Role</label>
+                                <select name="role" id="edit-role-{{ member.id }}">
+                                    {% for value, label in member_roles %}
+                                    <option value="{{ value }}"{% if member.role == value %} selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="edit-status-{{ member.id }}">Status</label>
+                                <select name="status" id="edit-status-{{ member.id }}">
+                                    {% for value, label in member_statuses %}
+                                    <option value="{{ value }}"{% if member.status == value %} selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <button type="submit" class="btn-add">Save</button>
+                            <button
+                                type="button"
+                                class="btn-cancel"
+                                onclick="toggleMemberEdit({{ member.id }})">
+                                Cancel
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty-message">No members found for this organisation.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="section-header">
+            <h2 class="section-title">Organisation Events</h2>
+        </div>
+        <!--
+        <form method="post" class="add-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_event">
+
+            <div class="form-group">
+                <label for="event">Add Event</label>
+                <select name="event" id="event" required>
+                    <option value="">Select event...</option>
+                    {% for event in available_events %}
+                    <option value="{{ event.id }}">
+                        {{ event.eventname }} ({{ event.eventdate }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button type="submit" class="btn-add"{% if not available_events %} disabled{% endif %}>
+                Add Event
+            </button>
+        </form>
+
+        {% if not available_events %}
+        <p class="empty-message">All events are already linked to this organisation.</p>
+        {% endif %}
+        -->
+        {% if organisation_events %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Event Name</th>
+                    <th>Event Date</th>
+                    <th>End Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for organisation_event in organisation_events %}
+                <tr>
+                    <td>{{ organisation_event.eventname }}</td>
+                    <td>{{ organisation_event.eventdate }}</td>
+                    <td>{{ organisation_event.eventenddate }}</td>
+                    <td>{{ organisation_event.get_eventstatus_display }}</td>
+                    <td>
+                        <a
+                            href="{% url 'event_details' organisation_event.id %}"
+                            class="event-link">
+                            View Event
+                        </a>
+                        <!--
+                        |                        
+                        <form method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="remove_event">
+                            <input type="hidden" name="event_id" value="{{ organisation_event.id }}">
+                            <button
+                                type="submit"
+                                class="btn-remove"
+                                onclick="return confirm('Remove this event from the organisation?');">
+                                Remove
+                            </button>
+                        </form>
+                        -->
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty-message">No events linked to this organisation.</p>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+function toggleMemberEdit(memberId) {
+    const editRow = document.getElementById(`member-edit-${memberId}`);
+    const viewRow = document.getElementById(`member-row-${memberId}`);
+
+    document.querySelectorAll('.edit-row.active').forEach(row => {
+        if (row.id !== `member-edit-${memberId}`) {
+            row.classList.remove('active');
+        }
+    });
+
+    editRow.classList.toggle('active');
+    viewRow.style.background = editRow.classList.contains('active') ? '#f8fafc' : '';
+}
+</script>
+
+{% endblock %}

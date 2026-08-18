@@ -1,958 +1,370 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Event Details</title>
-
-<style>
-
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-body {
-    font-family: Arial, sans-serif;
-    background: #f4f6f9;
-}
-
-.header {
-    background: #2563eb;
-    color: white;
-    padding: 15px 30px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.header-buttons {
-    display: flex;
-    gap: 10px;
-}
-
-.btn {
-    padding: 10px 16px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    text-decoration: none;
-    font-weight: bold;
-}
-
-.btn-back {
-    background: white;
-    color: #2563eb;
-}
-
-.btn-edit {
-    background: #16a34a;
-    color: white;
-}
-
-/* Main Layout */
-.container-main {
-    display: flex;
-    height: calc(100vh - 60px);
-}
-
-.container {
-    max-width: 1400px;
-    margin: 20px auto;
-    padding: 20px;
-}
-
-/* Left Navigation */
-.sidebar {
-    width: 250px;
-    background: #f4f4f4;
-    border-right: 1px solid #ddd;
-    padding-top: 20px;
-}
-
-.sidebar h3 {
-    padding: 0 20px 15px;
-    color: #333;
-}
-
-.sidebar a {
-    display: block;
-    padding: 12px 20px;
-    text-decoration: none;
-    color: #444;
-    transition: background 0.3s;
-}
-
-.sidebar a:hover {
-    background: #e5e7eb;
-}
-
-.sidebar a.active {
-    background: #2563eb;
-    color: white;
-}
-
-.card {
-    background: white;
-    padding: 25px;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.section-title {
-    margin-bottom: 20px;
-    color: #2563eb;
-    border-bottom: 2px solid #eee;
-    padding-bottom: 10px;
-}
-
-.details-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 15px 25px;
-}
-
-.field {
-    display: flex;
-    flex-direction: column;
-}
-
-.label {
-    font-weight: bold;
-    color: #555;
-    margin-bottom: 5px;
-}
-
-.value {
-    background: #f9fafb;
-    padding: 10px;
-    border-radius: 4px;
-    border: 1px solid #ddd;
-    min-height: 42px;
-}
-
-.description {
-    margin-top: 20px;
-    margin-bottom: 20px;
-}
-
-.description .value {
-    min-height: 150px;
-}
-
-@media(max-width:768px) {
-    .details-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .container-main {
-        flex-direction: column;
-    }
-
-    .sidebar {
-        width: 100%;
-        border-right: none;
-        border-bottom: 1px solid #ddd;
-    }
-}
-
-.image-section {
-    display: flex;
-    gap: 30px;
-    align-items: flex-start;
-    margin-bottom: 30px;
-}
-
-.current-image img {
-    width: 400px;
-    max-width: 100%;
-    height: auto;
-    border-radius: 8px;
-    border: 1px solid #ddd;
-    object-fit: cover;
-}
-
-.upload-section {
-    flex: 1;
-}
-
-.upload-label {
-    display: block;
-    font-weight: bold;
-    margin-bottom: 10px;
-}
-
-.upload-section input[type=file] {
-    width: 100%;
-    padding: 10px;
-}
-
-.upload-note {
-    color: #666;
-    margin-top: 10px;
-    font-size: 14px;
-}
-
-@media(max-width:768px) {
-
-    .image-section {
-        flex-direction: column;
-    }
-
-    .current-image img {
-        width: 100%;
-    }
-}
-
-.category-container {
-    display: flex;
-    flex-direction: column;
-    gap: 30px;
-    margin-bottom: 30px;
-}
-
-.category-card {
-    background: #fafafa;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 20px;
-}
-
-.category-header {
-    margin-bottom: 20px;
-}
-
-.category-image-section {
-    display: flex;
-    gap: 25px;
-    align-items: center;
-    margin-bottom: 25px;
-}
-
-.category-image {
-    width: 350px;
-    height: 180px;
-    object-fit: cover;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-}
-
-.subevent-image-section {
-    display: flex;
-    gap: 25px;
-    align-items: center;
-    margin-bottom: 25px;
-}
-
-.subevent-image {
-    width: 350px;
-    height: 180px;
-    object-fit: contain;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-}
-
-.subevent-title {
-    margin-bottom: 15px;
-}
-
-.subevent-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill,minmax(450px,1fr));
-    gap: 20px;
-    padding: 20px;
-}
-
-.subevent-card {
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 15px;
-    width: 400px;
-}
-
-/*
-.subevent-image {
-    width: 100%;
-    height: 180px;
-    object-fit: contain;
-    border-radius: 6px;
-    margin-bottom: 10px;
-}
-*/
-
-.subevent-details p {
-    margin: 8px 0;
-}
-
-@media(max-width:768px) {
-
-    .category-image-section {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .category-image {
-        width: 100%;
-    }
-}
-
-.upload-section{
-
-    margin-top:40px;
-
-    padding:20px;
-
-    background:#f8f9fa;
-
-    border:1px solid #ddd;
-
-    border-radius:8px;
-}
-
-.upload-section button{
-
-    padding:10px 20px;
-
-    background:#1976d2;
-
-    color:white;
-
-    border:none;
-
-    border-radius:5px;
-
-    cursor:pointer;
-}
-
-.upload-section button:hover{
-
-    background:#125ca1;
-}
-
-</style>
+<title>{{ event.eventname }} - Event Details</title>
+<link rel="stylesheet" href="{% static 'website/css/app.css' %}">
 </head>
+<body class="has-page-background" style="--page-background-image: url('{% static page_background_image %}');">
 
-<body>
-
-
-
-<div class="header">
-    <!-- Serializer data -->
-    {{ sub_events|json_script:"sub_events-data" }}
-
-    <h2>Start2Finish</h2>
-
+<div class="page-top-bar">
+    <h2>{{ event.eventname }}</h2>
     <div class="header-buttons">
-
-        <a href="/events" class="btn btn-back">
-            ← Back
-        </a>
-
-        <a href="/events-edit/{{ event.id }}/" class="btn btn-edit">
-            Edit Event
-        </a>
-
+        <a href="{% url 'events' %}" class="btn btn-back">← Back</a>
+        <a href="{% url 'event_details_edit' event.id %}" class="btn btn-success">Edit Event</a>
     </div>
-
 </div>
-
 
 <div class="container-main">
 
-    <!-- Left Navigation -->
-    <aside class="sidebar">
-        <h3>Event details</h3>
-
-        <a href="#" class="active">Event information</a>
-        <a href="/event_participants/{{event.id}}/">Participants</a>
-        <a href="#">Payment References</a>
-        <a href="#">Sponsors</a>
-        <a href="#">More information</a>
-        <a href="index.html">← Back to Home</a>
+    <aside class="app-sidebar">
+        <h3>Event sections</h3>
+        <a href="?section=details" class="nav-link{% if active_section == 'details' %} active{% endif %}" data-section="details">Event Details</a>
+        <a href="?section=image" class="nav-link{% if active_section == 'image' %} active{% endif %}" data-section="image">Event Image</a>
+        <a href="?section=sponsors" class="nav-link{% if active_section == 'sponsors' %} active{% endif %}" data-section="sponsors">Event Sponsors</a>
+        <a href="?section=categories" class="nav-link{% if active_section == 'categories' %} active{% endif %}" data-section="categories">Categories &amp; Subevents</a>
+        <a href="?section=information" class="nav-link{% if active_section == 'information' %} active{% endif %}" data-section="information">Event Information</a>
+        <a href="?section=notifications" class="nav-link{% if active_section == 'notifications' %} active{% endif %}" data-section="notifications">Event Notifications</a>
+        <a href="?section=participants" class="nav-link{% if active_section == 'participants' %} active{% endif %}" data-section="participants">Participants</a>
     </aside>
 
-    <!-- Content -->
     <main class="content">
-        <h1>Event information</h1>
-        <br>
+        <div class="content-inner">
 
-        <div class="container">
-
-            <div class="card">
-
-                <h2 class="section-title">Event Information</h2>
-
-                <div class="details-grid">
-
-                    <div class="field">
-                        <div class="label">Event ID</div>
-                        <div class="value">{{ event.eventid }}</div>
+            <!-- Event Details -->
+            <section id="section-details" class="detail-section{% if active_section == 'details' %} active{% endif %}">
+                <h1 class="page-heading">Event Details</h1>
+                <div class="card">
+                    <h2 class="section-title">Event Information</h2>
+                    <div class="details-grid">
+                        <div class="field"><div class="label">Event ID</div><div class="value">{{ event.eventid }}</div></div>
+                        <div class="field"><div class="label">Event Name</div><div class="value">{{ event.eventname }}</div></div>
+                        <div class="field"><div class="label">Event Start Date</div><div class="value">{{ event.eventdate }}</div></div>
+                        <div class="field"><div class="label">Event End Date</div><div class="value">{{ event.eventenddate }}</div></div>
+                        <div class="field"><div class="label">Event Status</div><div class="value">{{ event.get_eventstatus_display }}</div></div>
+                        <div class="field"><div class="label">Termination Status</div><div class="value">{{ event.terminationstatus|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Event Type</div><div class="value">{{ event.eventtype }}</div></div>
+                        <div class="field"><div class="label">Event Category</div><div class="value">{{ event.eventcategory }}</div></div>
+                        <div class="field"><div class="label">Organisation</div><div class="value">{{ event.organisation.name|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Athletic Organisation</div><div class="value">{{ event.athleticorganisation.name|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Athletics Category</div><div class="value">{{ event.athleticscategory.name|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Allow Registration</div><div class="value">{% if event.allowregistration %}Yes{% else %}No{% endif %}</div></div>
+                        <div class="field"><div class="label">Venue Name</div><div class="value">{{ event.venuename|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Sanction Status</div><div class="value">{{ event.sanctionstatus|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Sanction Reference</div><div class="value">{{ event.sanctionreference|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Registration Open Date</div><div class="value">{% if event.registrationopendate %}{{ event.registrationopendate }}{% else %}—{% endif %}</div></div>
+                        <div class="field"><div class="label">Registration Close Date</div><div class="value">{% if event.registrationclosedate %}{{ event.registrationclosedate }}{% else %}—{% endif %}</div></div>
+                        <div class="field"><div class="label">Maximum Participants</div><div class="value">{{ event.maximumparticipants|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Active</div><div class="value">{% if event.isactive %}Yes{% else %}No{% endif %}</div></div>
                     </div>
 
-                    <div class="field">
-                        <div class="label">Event Name</div>
-                        <div class="value">{{ event.eventname }}</div>
+                    <br><br>
+                    <h2 class="section-title">Contact Person Information</h2>
+                    <div class="details-grid">
+                        <div class="field"><div class="label">First Name</div><div class="value">{{ event.contactpersonname }}</div></div>
+                        <div class="field"><div class="label">Surname</div><div class="value">{{ event.contactpersonsurname }}</div></div>
+                        <div class="field"><div class="label">Other Name</div><div class="value">{{ event.contactpersonothername|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Email Address</div><div class="value">{{ event.contactpersonemailaddr|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Phone Number</div><div class="value">{{ event.contactpersonphonenum|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Citizenship</div><div class="value">{{ event.contactpersoncitizenship|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Nationality</div><div class="value">{{ event.contactpersonnationality|default:"—" }}</div></div>
                     </div>
 
-                    <div class="field">
-                        <div class="label">Event Start Date</div>
-                        <div class="value">{{ event.eventdate }}</div>
+                    <br><br>
+                    <h2 class="section-title">Address Information</h2>
+                    <div class="details-grid">
+                        <div class="field"><div class="label">Province</div><div class="value">{{ event.contactpersonprovince|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Country</div><div class="value">{{ event.contactpersoncountry|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Address Type</div><div class="value">{{ event.contactpersonaddrtype|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Address Line 1</div><div class="value">{{ event.contactpersonaddr1|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Address Line 2</div><div class="value">{{ event.contactpersonaddr2|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Address Line 3</div><div class="value">{{ event.contactpersonaddr3|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Address Line 4</div><div class="value">{{ event.contactpersonaddr4|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Postal Code</div><div class="value">{{ event.contactpersonaddrcode|default:"—" }}</div></div>
                     </div>
 
-                    <div class="field">
-                        <div class="label">Event End Date</div>
-                        <div class="value">{{ event.eventenddate }}</div>
+                    <br><br>
+                    <h2 class="section-title">Location Information</h2>
+                    <div class="details-grid">
+                        <div class="field"><div class="label">Start Point Latitude</div><div class="value">{{ event.startPointLat|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Start Point Longitude</div><div class="value">{{ event.startPointLng|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Parking Latitude</div><div class="value">{{ event.parkinglat|default:"—" }}</div></div>
+                        <div class="field"><div class="label">Parking Longitude</div><div class="value">{{ event.parkinglng|default:"—" }}</div></div>
                     </div>
 
-                    <div class="field">
-                        <div class="label">Event Status</div>
-                        <div class="value">{{ event.eventstatus }}</div>
+                    <div class="description">
+                        <h2 class="section-title">Event Description</h2>
+                        <div class="value">{{ event.eventdescription }}</div>
                     </div>
-
-                    <div class="field">
-                        <div class="label">Termination Status</div>
-                        <div class="value">{{ event.terminationstatus }}</div>
-                    </div>
-
-                    <div class="field">
-                        <div class="label">Event Type</div>
-                        <div class="value">{{ event.eventtype }}</div>
-                    </div>
-
-                    <div class="field">
-                        <div class="label">Event Category</div>
-                        <div class="value">{{ event.eventcategory }}</div>
-                    </div>
-
                 </div>
+            </section>
 
-                <br><br>
-
-                <h2 class="section-title">Contact Person Information</h2>
-
-                <div class="details-grid">
-
-                    <div class="field">
-                        <div class="label">First Name</div>
-                        <div class="value">{{ event.contactpersonname }}</div>
+            <!-- Event Image -->
+            <section id="section-image" class="detail-section{% if active_section == 'image' %} active{% endif %}">
+                <h1 class="page-heading">Event Image</h1>
+                <div class="card">
+                    <h2 class="section-title">Event Main Image</h2>
+                    <div class="image-section">
+                        <div class="current-image">
+                            {% if event_image and event_image.eventMainImg %}
+                            <img id="eventImagePreview" src="{{ event_image.eventMainImg.url }}" alt="Event Image">
+                            {% else %}
+                            <div class="no-image">No image uploaded</div>
+                            {% endif %}
+                        </div>
                     </div>
-
-                    <div class="field">
-                        <div class="label">Surname</div>
-                        <div class="value">{{ event.contactpersonsurname }}</div>
-                    </div>
-
-                    <div class="field">
-                        <div class="label">Other Name</div>
-                        <div class="value">{{ event.contactpersonothername }}</div>
-                    </div>
-
-                    <div class="field">
-                        <div class="label">Email Address</div>
-                        <div class="value">{{ event.contactpersonemailaddr }}</div>
-                    </div>
-
-                    <div class="field">
-                        <div class="label">Phone Number</div>
-                        <div class="value">{{ event.contactpersonphonenum }}</div>
-                    </div>
-
-                    <div class="field">
-                        <div class="label">Citizenship</div>
-                        <div class="value">{{ event.contactpersoncitizenship }}</div>
-                    </div>
-
-                    <div class="field">
-                        <div class="label">Nationality</div>
-                        <div class="value">{{ event.contactpersonnationality }}</div>
-                    </div>
-
                 </div>
+            </section>
 
-                <br><br>
-
-                <h2 class="section-title">Address Information</h2>
-
-                <div class="details-grid">
-
-                    <div class="field">
-                        <div class="label">Province</div>
-                        <div class="value">{{ event.contactpersonprovince }}</div>
+            <!-- Sponsors -->
+            <section id="section-sponsors" class="detail-section{% if active_section == 'sponsors' %} active{% endif %}">
+                <h1 class="page-heading">Event Sponsors</h1>
+                <div class="card">
+                    <h2 class="section-title">Sponsors</h2>
+                    {% if sponsors %}
+                    <div class="sponsor-grid">
+                        {% for sponsor in sponsors %}
+                        <div class="sponsor-card">
+                            {% if sponsor.sponsorImg %}
+                            <img src="{{ sponsor.sponsorImg.url }}" alt="{{ sponsor.companyname|default:'Sponsor' }}">
+                            {% endif %}
+                            <h4>{{ sponsor.companyname|default:"—" }}</h4>
+                            <p>{{ sponsor.description|default:"" }}</p>
+                            <p><strong>Category:</strong> {{ sponsor.get_sponsorcategory_display }}</p>
+                            {% if sponsor.externallink %}
+                            <p><a href="{{ sponsor.externallink }}" target="_blank" rel="noopener">External link</a></p>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
                     </div>
-
-                    <div class="field">
-                        <div class="label">Country</div>
-                        <div class="value">{{ event.contactpersoncountry }}</div>
-                    </div>
-
-                    <div class="field">
-                        <div class="label">Address Type</div>
-                        <div class="value">{{ event.contactpersonaddrtype }}</div>
-                    </div>
-
-                    <div class="field">
-                        <div class="label">Address Line 1</div>
-                        <div class="value">{{ event.contactpersonaddr1 }}</div>
-                    </div>
-
-                    <div class="field">
-                        <div class="label">Address Line 2</div>
-                        <div class="value">{{ event.contactpersonaddr2 }}</div>
-                    </div>
-
-                    <div class="field">
-                        <div class="label">Address Line 3</div>
-                        <div class="value">{{ event.contactpersonaddr3 }}</div>
-                    </div>
-
-                    <div class="field">
-                        <div class="label">Address Line 4</div>
-                        <div class="value">{{ event.contactpersonaddr4 }}</div>
-                    </div>
-
-                    <div class="field">
-                        <div class="label">Postal Code</div>
-                        <div class="value">{{ event.contactpersonaddrcode }}</div>
-                    </div>
-
+                    {% else %}
+                    <p class="empty-message">No sponsors for this event.</p>
+                    {% endif %}
                 </div>
+            </section>
 
-                <br><br>
-
-                <h2 class="section-title">Location Information</h2>
-
-                <div class="details-grid">
-
-                    <div class="field">
-                        <div class="label">Start Point Latitude</div>
-                        <div class="value">{{ event.startPointLat }}</div>
+            <!-- Categories & Subevents -->
+            <section id="section-categories" class="detail-section{% if active_section == 'categories' %} active{% endif %}">
+                <h1 class="page-heading">Categories &amp; Subevents</h1>
+                <div class="card">
+                    <h2 class="section-title">Event Categories</h2>
+                    {% for block in category_blocks %}
+                    <div class="category-block">
+                        <h3>{{ block.category.categoryname }}</h3>
+                        <div class="subevent-grid">
+                            {% for subevent in block.subevents %}
+                            <div class="subevent-card">
+                                {% if subevent.elevationImg %}
+                                <img src="{{ subevent.elevationImg.url }}" class="subevent-image" alt="{{ subevent.name }}">
+                                {% else %}
+                                <div class="subevent-image" style="display:flex;align-items:center;justify-content:center;color:#9ca3af;">No image</div>
+                                {% endif %}
+                                <h4>{{ subevent.name }}</h4>
+                                <div class="subevent-details">
+                                    <p><strong>Date:</strong> {{ subevent.eventsubdate }}</p>
+                                    <p><strong>Rate:</strong> {{ subevent.regfees }} {{ subevent.regfeescurrency }}</p>
+                                    <p><strong>Sequence:</strong> {{ subevent.displaysequence }}</p>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
                     </div>
-
-                    <div class="field">
-                        <div class="label">Start Point Longitude</div>
-                        <div class="value">{{ event.startPointLng }}</div>
-                    </div>
-
+                    {% empty %}
+                    <p class="empty-message">No categories with subevents for this event.</p>
+                    {% endfor %}
                 </div>
+            </section>
 
-                <div class="description">
-
-                    <h2 class="section-title">Event Description</h2>
-
-                    <div class="value">
-                        {{event.eventdescription}}
+            <!-- Information -->
+            <section id="section-information" class="detail-section{% if active_section == 'information' %} active{% endif %}">
+                <h1 class="page-heading">Event Information</h1>
+                <div class="card">
+                    <h2 class="section-title">Information Items</h2>
+                    {% if information_items %}
+                    <div class="info-grid">
+                        {% for info in information_items %}
+                        <div class="info-card">
+                            {% if info.infoImg %}
+                            <img src="{{ info.infoImg.url }}" alt="{{ info.name }}">
+                            {% endif %}
+                            <strong>{{ info.name }}</strong>
+                        </div>
+                        {% endfor %}
                     </div>
-
+                    {% else %}
+                    <p class="empty-message">No information items for this event.</p>
+                    {% endif %}
                 </div>
+            </section>
 
-                <h2 class="section-title">Event Image</h2>
+            <!-- Notifications -->
+            <section id="section-notifications" class="detail-section{% if active_section == 'notifications' %} active{% endif %}">
+                <h1 class="page-heading">Event Notifications</h1>
+                <div class="card">
+                    <h2 class="section-title">Notifications</h2>
+                    {% if notifications %}
+                    <table class="data-table">
+                        <thead><tr><th>Title</th><th>Message</th><th>Image</th><th>PDF</th></tr></thead>
+                        <tbody>
+                        {% for notification in notifications %}
+                        <tr>
+                            <td>{{ notification.title|default:"—" }}</td>
+                            <td>{{ notification.message|default:"—" }}</td>
+                            <td>{% if notification.notificationImg %}<img src="{{ notification.notificationImg.url }}" class="thumb">{% else %}—{% endif %}</td>
+                            <td>
+                                {% if notification.notificationPdf %}
+                                <a href="{{ notification.notificationPdf.url }}" class="btn btn-view" download>Download PDF</a>
+                                {% else %}—{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="empty-message">No notifications for this event.</p>
+                    {% endif %}
+                </div>
+            </section>
 
-                <div class="image-section">
-
-                    <div class="current-image">
-                        <img
-                            id="eventImagePreview"    
-                            src="{{ event.eventimage_event.eventMainImg.url }}"
-                            alt="Event Image">
+            <!-- Participants -->
+            <section id="section-participants" class="detail-section{% if active_section == 'participants' %} active{% endif %}">
+                <h1 class="page-heading">Participants</h1>
+                <div class="card">
+                    <h2 class="section-title">Registered Participants</h2>
+                    {% if participant_events %}
+                    <div class="participant-grid">
+                        {% for pe in participant_events %}
+                        <div class="participant-card" data-target="paymref-panel-{{ pe.id }}" onclick="toggleParticipantPanel(this)">
+                            <h4>{{ pe.participant.firstname }} {{ pe.participant.surname }}</h4>
+                            <p><strong>Email:</strong> {{ pe.participant.emailaddress }}</p>
+                            <p><strong>Subevent:</strong> {{ pe.subevent.name }}</p>
+                            <p><strong>Category:</strong> {{ pe.subevent.eventcategory.categoryname }}</p>
+                            <p><strong>Status:</strong> {{ pe.participantstatus|default:"—" }}</p>
+                            <p><strong>Registered:</strong> {{ pe.eventregdate|date:"Y-m-d H:i"|default:"—" }}</p>
+                            <p><strong>Payment:</strong> {% if pe.paymref %}{{ pe.paymref.payment_status|default:"—" }}{% else %}No payment ref{% endif %}</p>
+                        </div>
+                        {% endfor %}
                     </div>
+
+                    {% for pe in participant_events %}
+                    <div id="paymref-panel-{{ pe.id }}" class="paymref-panel">
+                        <h3>Payment Reference — {{ pe.participant.firstname }} {{ pe.participant.surname }} ({{ pe.subevent.name }})</h3>
+                        {% if pe.paymref %}
+                        <div class="details-grid">
+                            <div class="field"><div class="label">Merchant ID</div><div class="value">{{ pe.paymref.merchant_id|default:"—" }}</div></div>
+                            <div class="field"><div class="label">First Name</div><div class="value">{{ pe.paymref.name_first|default:"—" }}</div></div>
+                            <div class="field"><div class="label">Last Name</div><div class="value">{{ pe.paymref.name_last|default:"—" }}</div></div>
+                            <div class="field"><div class="label">Email</div><div class="value">{{ pe.paymref.email_address|default:"—" }}</div></div>
+                            <div class="field"><div class="label">Payment ID</div><div class="value">{{ pe.paymref.m_paym_id|default:"—" }}</div></div>
+                            <div class="field"><div class="label">Amount</div><div class="value">{{ pe.paymref.amount }}</div></div>
+                            <div class="field"><div class="label">Item Name</div><div class="value">{{ pe.paymref.item_name|default:"—" }}</div></div>
+                            <div class="field"><div class="label">Payment UUID</div><div class="value">{{ pe.paymref.payment_uuid|default:"—" }}</div></div>
+                            <div class="field"><div class="label">Payment Timestamp</div><div class="value">{{ pe.paymref.payment_timestamp|default:"—" }}</div></div>
+                            <div class="field"><div class="label">Payment Status</div><div class="value">{{ pe.paymref.payment_status|default:"—" }}</div></div>
+                        </div>
+                        {% else %}
+                        <p class="empty-message">No payment reference linked to this registration.</p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <p class="empty-message">No participants registered for this event.</p>
+                    {% endif %}
 
                     <div class="upload-section">
-
-                        <label class="upload-label">
-                            Upload New Image
-                        </label>
-
-                        <input
-                            type="file"
-                            id="eventImage"
-                            accept="image/*">
-
-                        <p class="upload-note">
-                            Supported formats: JPG, PNG, GIF
-                        </p>
-
-                    </div>
-
-                </div>
-
-                <!-- Event Categories -->
-
-                <h2 class="section-title">Event Categories</h2>      
-                    <div class="category-container" id="subeventsgrid2">
-                        <!-- Sub Events for Cycling will be dynamically loaded here -->
-
-                    </div>
-
-                <!-- Participants upload -->
-
-                <h2 class="section-title">Participants upload</h2>
-                    <div class="upload-section">
-
-                        <h2>Import particpants</h2>
-
-                        <p>
-                            Select an Excel (.xlsx or .xls) file to upload.
-                        </p>
-
+                        <h2 class="section-title">Participants Upload</h2>
+                        <p>Select an Excel (.xlsx or .xls) file to upload.</p>
                         <form id="excelUploadForm">
                             {% csrf_token %}
-                            <input
-                                type="file"
-                                id="excelFile"
-                                name="file"
-                                accept=".xlsx,.xls"
-                                required>
-
+                            <input type="file" id="excelFile" name="file" accept=".xlsx,.xls" required>
                             <br><br>
-
-                            <button type="submit">
-                                Upload Excel
-                            </button>
-
+                            <button type="submit">Upload Excel</button>
                         </form>
-
                         <div id="uploadMessage"></div>
-
                     </div>
-            </div>
+                </div>
+            </section>
 
         </div>
     </main>
+</div>
+
 <script>
-    /*
-    document
-    .getElementById('productImage')
-    .addEventListener('change', function () {
-
-        const file = this.files[0];
-
-        if (file) {
-
-            const preview =
-                document.getElementById('productImagePreview');
-
-            preview.src = URL.createObjectURL(file);
-        }
+function showSection(sectionId) {
+    document.querySelectorAll('.detail-section').forEach(section => {
+        section.classList.remove('active');
     });
-    */
+    document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+        link.classList.remove('active');
+    });
+    const section = document.getElementById('section-' + sectionId);
+    const link = document.querySelector('.sidebar .nav-link[data-section="' + sectionId + '"]');
+    if (section) section.classList.add('active');
+    if (link) link.classList.add('active');
+}
 
-    document.addEventListener(
-        'DOMContentLoaded',
-        loadSubEvents
-    );
+document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+    link.addEventListener('click', function(event) {
+        event.preventDefault();
+        const sectionId = this.dataset.section;
+        showSection(sectionId);
+        const url = new URL(window.location.href);
+        url.searchParams.set('section', sectionId);
+        window.history.replaceState({}, '', url);
+    });
+});
 
-    document
-    .getElementById('eventImage')
-    .addEventListener('change', async function() {
+function toggleParticipantPanel(card) {
+    const panelId = card.dataset.target;
+    const panel = document.getElementById(panelId);
+    const isActive = panel.classList.contains('active');
 
-        const file = this.files[0];
+    document.querySelectorAll('.participant-card.selected').forEach(c => c.classList.remove('selected'));
+    document.querySelectorAll('.paymref-panel.active').forEach(p => p.classList.remove('active'));
 
-        if (!file) return;
+    if (!isActive) {
+        card.classList.add('selected');
+        panel.classList.add('active');
+        panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
 
-        const formData = new FormData();
+document.getElementById('excelUploadForm').addEventListener('submit', async function(event) {
+    event.preventDefault();
 
-        formData.append('image', file);
+    const file = document.getElementById('excelFile').files[0];
+    if (!file) {
+        alert('Please select an Excel file.');
+        return;
+    }
 
-        await fetch('/api/events/100001/upload-image/', {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const response = await fetch('/api/participants_import/', {
             method: 'POST',
-            body: formData
+            body: formData,
+            credentials: 'same-origin',
+            headers: { 'X-CSRFToken': csrfToken },
         });
-    });
 
-    function previewCategoryImage(input, imageId) {
-
-        if (input.files && input.files[0]) {
-
-            const reader = new FileReader();
-
-            reader.onload = function(e) {
-
-                document
-                    .getElementById(imageId)
-                    .src = e.target.result;
-            };
-
-            reader.readAsDataURL(input.files[0]);
+        if (response.ok) {
+            document.getElementById('uploadMessage').innerHTML =
+                "<span style='color:green'>Upload successful.</span>";
+        } else {
+            const error = await response.text();
+            document.getElementById('uploadMessage').innerHTML =
+                "<span style='color:red'>Upload failed: " + error + "</span>";
         }
-    }   
-
-    function subEvents() {
-        event.subEvents.forEach(subEvent => {
-            console.log('Sub Event Name:', subEvent.name);
-            console.log('Sub Event Date:', subEvent.date);
-            console.log('Sub Event Rate:', subEvent.rate);
-            console.log('Sub Event Currency:', subEvent.currency);
-        });
+    } catch (ex) {
+        document.getElementById('uploadMessage').innerHTML =
+            "<span style='color:red'>" + ex.message + "</span>";
     }
-
-    async function loadSubEvents() {
-
-        try {
-
-            const eventid =  event.id ;
-
-            const subeventurl = `/api/subevents_event/67/`
-
-            const subeventurl2 = `/api/subevents_event/{{event_id}}/`
-
-            console.log('Sub Event URL:', subeventurl2);
-
-            /*
-            const sub_events_data = JSON.parse(
-                document.getElementById("sub_events-data").textContent
-            );
-            */
-            /*
-            const response = await fetch(
-                subeventurl2,
-                {
-                    credentials: 'same-origin'
-                }
-            );
-            */
-            //const subevents = await response.json();
-
-            const subevents = JSON.parse(
-                document.getElementById(
-                    "sub_events-data"
-                ).textContent
-            );
-
-            const groupedSubevents = subevents.reduce((groups, subevent) => {
-
-                const category = subevent.category_name;
-
-                if (!groups[category]) {
-                    groups[category] = [];
-                }
-
-                groups[category].push(subevent);
-
-                return groups;
-
-            }, {});
-
-            const container =
-                document.getElementById(
-                    'subeventsgrid2'
-                );
-
-            container.className = 'category-container';
-            container.innerHTML = '';
-
-            /*
-            subevents.forEach(
-                subEvent => {
-                    console.log('Sub Event Name:', subEvent.name);
-                    console.log('Sub Event Date:', subEvent.eventsubdate);
-                    console.log('Sub Event Rate:', subEvent.regfees);
-                    console.log('Sub Event Currency:', subEvent.regfeescurrency);
-                }
-            )
-            */
-
-            //const categoryHeader = document.createElement('div');
-            //categoryHeader.className = 'category-container';
-            //categoryHeader.innerHTML = '' ;
-
-
-            for (const [category, subeventscategory] of Object.entries(groupedSubevents)) {
-
-            //groupedSubevents.forEach((subeventscategory, category) => {
-                
-                const categorycard = document.createElement('div');
-                categorycard.textContent = `Category: ${category}`;
-                categorycard.className = 'category-card';
-
-                categorycard.innerHTML = '' ;
-
-                const categoryhdr = document.createElement('div');
-                categoryhdr.className = 'category-header';
-                categoryhdr.innerHTML = `<h3>${category}</h3>`;
-
-                categorycard.appendChild(categoryhdr);                
-
-                const subeventgrid = document.createElement('div');
-                subeventgrid.textContent = `Category: ${category}`;
-                subeventgrid.className = 'subevent-grid';
-
-                subeventgrid.innerHTML = '' ;
-
-
-
-                
-
-                //const card =
-                //        document.createElement('div');
-
-                subeventscategory.forEach(subEvent => {
-
-                    const card =
-                        document.createElement('div');
-
-                    card.className =
-                        'subevent-card';
-
-                    card.innerHTML = `
-
-                        <img
-                            src="${subEvent.elevationImg}"
-                            class="subevent-image"
-                            id="subImage4">
-
-                        <input
-                            type="file"
-                            accept="image/*"
-                            onchange="previewCategoryImage(this,'subImage4')">
-
-                        <h3>
-                            ${subEvent.name}
-                        </h3>
-
-                        <div class="subevent-details">
-                            <p><strong>Name:</strong> ${subEvent.name}</p>
-                            <p><strong>Date:</strong> ${subEvent.eventsubdate}</p>
-                            <p><strong>Rate:</strong> ${subEvent.regfees}</p>
-                            <p><strong>Currency:</strong> ${subEvent.regfeescurrency}</p>
-                        </div>
-                    `;
-
-                    subeventgrid.appendChild(card);
-                });
-
-                categorycard.appendChild(subeventgrid);
-                container.appendChild(categorycard);
-
-                //container.appendChild(subeventgrid);
-            };
-
-            /*
-            subevents.forEach(
-                subEvent => {
-
-                    const card =
-                        document.createElement('div');
-
-                    card.className =
-                        'subevent-card';
-
-                    card.innerHTML = `
-
-                        <img
-                            src="${subEvent.elevationImg}"
-                            class="subevent-image"
-                            id="subImage4">
-
-                        <input
-                            type="file"
-                            accept="image/*"
-                            onchange="previewCategoryImage(this,'subImage4')">
-
-                        <h3>
-                            ${subEvent.name}
-                        </h3>
-
-                        <div class="subevent-details">
-                            <p><strong>Name:</strong> ${subEvent.name}</p>
-                            <p><strong>Date:</strong> ${subEvent.eventsubdate}</p>
-                            <p><strong>Rate:</strong> ${subEvent.regfees}</p>
-                            <p><strong>Currency:</strong> ${subEvent.regfeescurrency}</p>
-                        </div>
-                    `;
-
-                    container.appendChild(card);
-                }
-            );
-            */
-        }
-        catch(error) {
-
-            console.error(error);
-        }
-    }
+});
 </script>
-
-<script>
-  // Your URL variable
-    const data = event.eventimage ;
-    const imageUrl = event.eventimage_event.eventMainImg.url ;
-  
-  // Set the src attribute dynamically
-    const imgElement = document.getElementById("eventImagePreview");
-    imgElement.src = imageUrl;
-</script>
-
-<script>
-    document.getElementById("excelUploadForm").addEventListener(
-    "submit",
-        async function(event) {
-
-            event.preventDefault();
-
-            const file =
-                document.getElementById("excelFile").files[0];
-
-            if (!file) {
-
-                alert("Please select an Excel file.");
-
-                return;
-            }
-
-            const formData = new FormData();
-
-            formData.append("file", file);
-
-            try {
-
-                const csrfToken = document.querySelector(
-                    '[name=csrfmiddlewaretoken]'
-                ).value;
-
-                const response = await fetch(
-                    "/api/participants_import/",
-                    {
-                        method: "POST",
-                        body: formData,
-                        credentials: "same-origin",
-                        headers: {
-                        "X-CSRFToken": csrfToken
-                    }
-                    }
-                );
-
-                if (response.ok) {
-
-                    document.getElementById("uploadMessage").innerHTML =
-                        "<span style='color:green'>Upload successful.</span>";
-
-                } else {
-
-                    const error = await response.text();
-
-                    document.getElementById("uploadMessage").innerHTML =
-                        "<span style='color:red'>Upload failed: "
-                        + error +
-                        "</span>";
-                }
-
-            }
-            catch(ex){
-
-                document.getElementById("uploadMessage").innerHTML =
-                    "<span style='color:red'>"
-                    + ex.message +
-                    "</span>";
-            }
-
-        }
-    );
-</script>
-
-
-
 </body>
-</html> 
-
+</html>

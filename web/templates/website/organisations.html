@@ -1,0 +1,56 @@
+{% extends 'website/basepage.html' %}
+
+{% block title %}Organisations{% endblock %}
+
+{% block content %}
+
+<div class="page-shell">
+    <div class="page-container">
+        <div class="content-header">
+            <div class="content-header-text">
+                <h1>Organisations</h1>
+                <p>View and manage organisation records.</p>
+            </div>
+        </div>
+
+        {% if organisations %}
+        <div class="card-container">
+            {% for organisation in organisations %}
+            <div class="organisation-card">
+                {% if organisation.logo %}
+                <img src="{{ organisation.logo.url }}" alt="{{ organisation.name }}" class="organisation-image">
+                {% else %}
+                <div class="organisation-image"></div>
+                {% endif %}
+
+                <h3>{{ organisation.name }}</h3>
+                <p><strong>Contact:</strong> {{ organisation.contactperson|default:"—" }}</p>
+                <p>
+                    <strong>Location:</strong>
+                    {% if organisation.province or organisation.country %}
+                        {{ organisation.province }}{% if organisation.province and organisation.country %}, {% endif %}{{ organisation.country }}
+                    {% else %}—{% endif %}
+                </p>
+                <p><strong>Email:</strong> {{ organisation.email|default:"—" }}</p>
+                <p><strong>Phone:</strong> {{ organisation.phone|default:"—" }}</p>
+                <p><span class="status-badge">{{ organisation.get_status_display }}</span></p>
+
+                <button class="organisation-detail-btn" onclick="openOrganisation({{ organisation.id }})">
+                    View Details
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-state">No organisations found.</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function openOrganisation(id) {
+    window.location.href = `/organisations/${id}/`;
+}
+</script>
+
+{% endblock %}

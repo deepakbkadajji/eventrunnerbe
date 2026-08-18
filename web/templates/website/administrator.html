@@ -1,0 +1,579 @@
+{% extends 'website/basepage.html' %}
+
+{% block title %}
+Administrator
+{% endblock %}
+
+{% block content %}
+
+
+<div class="page-header">
+    <h1>Administrator</h1>
+    <a href="{% url 'userhome' %}" class="back-link">← Back to Home</a>
+</div>
+
+<div class="container-main">
+    <aside class="app-sidebar">
+        <h3>Manage records</h3>
+        <a href="?section=event-categories" class="nav-link{% if active_section == 'event-categories' %} active{% endif %}" data-section="event-categories">Event Categories</a>
+        <a href="?section=subscription-plans" class="nav-link{% if active_section == 'subscription-plans' %} active{% endif %}" data-section="subscription-plans">Subscription Plans</a>
+        <a href="?section=subscriptions" class="nav-link{% if active_section == 'subscriptions' %} active{% endif %}" data-section="subscriptions">Subscriptions</a>
+        <a href="?section=app-release-versions" class="nav-link{% if active_section == 'app-release-versions' %} active{% endif %}" data-section="app-release-versions">App Release Versions</a>
+        <a href="?section=terms-and-conditions" class="nav-link{% if active_section == 'terms-and-conditions' %} active{% endif %}" data-section="terms-and-conditions">Terms &amp; Conditions</a>
+    </aside>
+
+    <main class="content">
+        <div class="content-inner">
+
+            {% if messages %}
+            <ul class="messages">
+                {% for message in messages %}
+                <li class="{{ message.tags }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+
+            <!-- Event Categories -->
+            <section id="section-event-categories" class="admin-section{% if active_section == 'event-categories' %} active{% endif %}">
+                <h2 class="page-heading">Event Categories</h2>
+                <div class="card">
+                    <h3 class="section-title">Add Category</h3>
+                    <form method="post" class="add-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="add_category">
+                        <div class="form-group">
+                            <label>Category Name</label>
+                            <input type="text" name="categoryname" required maxlength="50">
+                        </div>
+                        <button type="submit" class="btn-add">Add Category</button>
+                    </form>
+
+                    {% if event_categories %}
+                    <table class="data-table">
+                        <thead><tr><th>ID</th><th>Name</th><th>Actions</th></tr></thead>
+                        <tbody>
+                        {% for category in event_categories %}
+                        <tr>
+                            <td>{{ category.id }}</td>
+                            <td>{{ category.categoryname }}</td>
+                            <td>
+                                <button type="button" class="btn-edit" onclick="toggleRow('cat-edit-{{ category.id }}')">Edit</button>
+                                <form method="post" style="display:inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="delete_category">
+                                    <input type="hidden" name="category_id" value="{{ category.id }}">
+                                    <button type="submit" class="btn-remove" onclick="return confirm('Delete this category?');">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        <tr id="cat-edit-{{ category.id }}" class="edit-row">
+                            <td colspan="3">
+                                <form method="post" class="add-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="edit_category">
+                                    <input type="hidden" name="category_id" value="{{ category.id }}">
+                                    <div class="form-group">
+                                        <label>Category Name</label>
+                                        <input type="text" name="categoryname" value="{{ category.categoryname }}" required maxlength="50">
+                                    </div>
+                                    <button type="submit" class="btn-add">Save</button>
+                                    <button type="button" class="btn-cancel" onclick="toggleRow('cat-edit-{{ category.id }}')">Cancel</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="empty-message">No event categories yet.</p>
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- Subscription Plans -->
+            <section id="section-subscription-plans" class="admin-section{% if active_section == 'subscription-plans' %} active{% endif %}">
+                <h2 class="page-heading">Subscription Plans</h2>
+                <div class="card">
+                    <h3 class="section-title">Add Plan</h3>
+                    <form method="post" class="add-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="add_plan">
+                        <div class="form-group"><label>Plan Code</label><input type="text" name="plancode" required maxlength="30"></div>
+                        <div class="form-group"><label>Plan Name</label><input type="text" name="planname" required maxlength="100"></div>
+                        <div class="form-group">
+                            <label>Subscriber Type</label>
+                            <select name="subscribertype" required>
+                                {% for value, label in subscriber_types %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Billing Frequency</label>
+                            <select name="billingfrequency" required>
+                                {% for value, label in billing_frequencies %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Price</label><input type="number" step="0.01" name="price" required></div>
+                        <div class="form-group"><label>Currency</label><input type="text" name="currencycode" value="ZAR" maxlength="3"></div>
+                        <div class="form-group"><label>Max Members</label><input type="number" name="maximummembers"></div>
+                        <div class="form-group"><label>Max Events</label><input type="number" name="maximumevents"></div>
+                        <div class="form-group">
+                            <label>Active</label>
+                            <select name="isactive"><option value="true" selected>Yes</option><option value="false">No</option></select>
+                        </div>
+                        <button type="submit" class="btn-add">Add Plan</button>
+                    </form>
+
+                    {% if subscription_plans %}
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Code</th><th>Name</th><th>Type</th><th>Billing</th>
+                                <th>Price</th><th>Active</th><th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for plan in subscription_plans %}
+                        <tr>
+                            <td>{{ plan.plancode }}</td>
+                            <td>{{ plan.planname }}</td>
+                            <td>{{ plan.get_subscribertype_display }}</td>
+                            <td>{{ plan.get_billingfrequency_display }}</td>
+                            <td>{{ plan.price }} {{ plan.currencycode }}</td>
+                            <td>{% if plan.isactive %}Yes{% else %}No{% endif %}</td>
+                            <td>
+                                <button type="button" class="btn-edit" onclick="toggleRow('plan-edit-{{ plan.id }}')">Edit</button>
+                                <form method="post" style="display:inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="delete_plan">
+                                    <input type="hidden" name="plan_id" value="{{ plan.id }}">
+                                    <button type="submit" class="btn-remove" onclick="return confirm('Delete this plan?');">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        <tr id="plan-edit-{{ plan.id }}" class="edit-row">
+                            <td colspan="7">
+                                <form method="post" class="add-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="edit_plan">
+                                    <input type="hidden" name="plan_id" value="{{ plan.id }}">
+                                    <div class="form-group"><label>Plan Code</label><input type="text" name="plancode" value="{{ plan.plancode }}" required></div>
+                                    <div class="form-group"><label>Plan Name</label><input type="text" name="planname" value="{{ plan.planname }}" required></div>
+                                    <div class="form-group"><label>Subscriber Type</label>
+                                        <select name="subscribertype">
+                                            {% for value, label in subscriber_types %}
+                                            <option value="{{ value }}"{% if plan.subscribertype == value %} selected{% endif %}>{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="form-group"><label>Billing Frequency</label>
+                                        <select name="billingfrequency">
+                                            {% for value, label in billing_frequencies %}
+                                            <option value="{{ value }}"{% if plan.billingfrequency == value %} selected{% endif %}>{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="form-group"><label>Price</label><input type="number" step="0.01" name="price" value="{{ plan.price }}"></div>
+                                    <div class="form-group"><label>Currency</label><input type="text" name="currencycode" value="{{ plan.currencycode }}" maxlength="3"></div>
+                                    <div class="form-group"><label>Max Members</label><input type="number" name="maximummembers" value="{{ plan.maximummembers|default:'' }}"></div>
+                                    <div class="form-group"><label>Max Events</label><input type="number" name="maximumevents" value="{{ plan.maximumevents|default:'' }}"></div>
+                                    <div class="form-group"><label>Active</label>
+                                        <select name="isactive">
+                                            <option value="true"{% if plan.isactive %} selected{% endif %}>Yes</option>
+                                            <option value="false"{% if not plan.isactive %} selected{% endif %}>No</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="btn-add">Save</button>
+                                    <button type="button" class="btn-cancel" onclick="toggleRow('plan-edit-{{ plan.id }}')">Cancel</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="empty-message">No subscription plans yet.</p>
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- Subscriptions -->
+            <section id="section-subscriptions" class="admin-section{% if active_section == 'subscriptions' %} active{% endif %}">
+                <h2 class="page-heading">Subscriptions</h2>
+                <div class="card">
+                    <h3 class="section-title">Add Subscription</h3>
+                    <form method="post" class="add-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="add_subscription">
+                        <div class="form-group">
+                            <label>Plan</label>
+                            <select name="subscriptionplan" required>
+                                <option value="">Select plan...</option>
+                                {% for plan in subscription_plans %}
+                                <option value="{{ plan.id }}">{{ plan.plancode }} — {{ plan.planname }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Participant</label>
+                            <select name="participant">
+                                <option value="">None</option>
+                                {% for p in participants %}
+                                <option value="{{ p.id }}">{{ p.firstname }} {{ p.surname }} ({{ p.emailaddress }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Athletic Organisation</label>
+                            <select name="athleticorganisation">
+                                <option value="">None</option>
+                                {% for org in athletic_organisations %}
+                                <option value="{{ org.id }}">{{ org.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Start Date</label><input type="date" name="subscriptionstartdate" required></div>
+                        <div class="form-group"><label>End Date</label><input type="date" name="subscriptionenddate"></div>
+                        <div class="form-group"><label>Next Billing Date</label><input type="date" name="nextbillingdate"></div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select name="subscriptionstatus">
+                                {% for value, label in subscription_statuses %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Auto Renew</label>
+                            <select name="autorenew"><option value="false" selected>No</option><option value="true">Yes</option></select>
+                        </div>
+                        <div class="form-group"><label>External Customer ID</label><input type="text" name="externalcustomerid" maxlength="100"></div>
+                        <div class="form-group"><label>External Payment ID</label><input type="text" name="externalpaymentid" maxlength="100"></div>
+                        <button type="submit" class="btn-add">Add Subscription</button>
+                    </form>
+
+                    {% if subscriptions %}
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Plan</th><th>Participant</th><th>Organisation</th>
+                                <th>Start</th><th>End</th><th>Status</th><th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for sub in subscriptions %}
+                        <tr>
+                            <td>{{ sub.subscriptionplan.planname }}</td>
+                            <td>{% if sub.participant %}{{ sub.participant.firstname }} {{ sub.participant.surname }}{% else %}—{% endif %}</td>
+                            <td>{% if sub.athleticorganisation %}{{ sub.athleticorganisation.name }}{% else %}—{% endif %}</td>
+                            <td>{{ sub.subscriptionstartdate }}</td>
+                            <td>{{ sub.subscriptionenddate|default:"—" }}</td>
+                            <td>{{ sub.get_subscriptionstatus_display }}</td>
+                            <td>
+                                <button type="button" class="btn-edit" onclick="toggleRow('sub-edit-{{ sub.id }}')">Edit</button>
+                                <form method="post" style="display:inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="delete_subscription">
+                                    <input type="hidden" name="subscription_id" value="{{ sub.id }}">
+                                    <button type="submit" class="btn-remove" onclick="return confirm('Delete this subscription?');">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        <tr id="sub-edit-{{ sub.id }}" class="edit-row">
+                            <td colspan="7">
+                                <form method="post" class="add-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="edit_subscription">
+                                    <input type="hidden" name="subscription_id" value="{{ sub.id }}">
+                                    <div class="form-group"><label>Plan</label>
+                                        <select name="subscriptionplan">
+                                            {% for plan in subscription_plans %}
+                                            <option value="{{ plan.id }}"{% if sub.subscriptionplan_id == plan.id %} selected{% endif %}>{{ plan.planname }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="form-group"><label>Participant</label>
+                                        <select name="participant">
+                                            <option value="">None</option>
+                                            {% for p in participants %}
+                                            <option value="{{ p.id }}"{% if sub.participant_id == p.id %} selected{% endif %}>{{ p.firstname }} {{ p.surname }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="form-group"><label>Athletic Organisation</label>
+                                        <select name="athleticorganisation">
+                                            <option value="">None</option>
+                                            {% for org in athletic_organisations %}
+                                            <option value="{{ org.id }}"{% if sub.athleticorganisation_id == org.id %} selected{% endif %}>{{ org.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="form-group"><label>Start Date</label><input type="date" name="subscriptionstartdate" value="{{ sub.subscriptionstartdate|date:'Y-m-d' }}" required></div>
+                                    <div class="form-group"><label>End Date</label><input type="date" name="subscriptionenddate" value="{{ sub.subscriptionenddate|date:'Y-m-d' }}"></div>
+                                    <div class="form-group"><label>Next Billing</label><input type="date" name="nextbillingdate" value="{{ sub.nextbillingdate|date:'Y-m-d' }}"></div>
+                                    <div class="form-group"><label>Status</label>
+                                        <select name="subscriptionstatus">
+                                            {% for value, label in subscription_statuses %}
+                                            <option value="{{ value }}"{% if sub.subscriptionstatus == value %} selected{% endif %}>{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="form-group"><label>Auto Renew</label>
+                                        <select name="autorenew">
+                                            <option value="true"{% if sub.autorenew %} selected{% endif %}>Yes</option>
+                                            <option value="false"{% if not sub.autorenew %} selected{% endif %}>No</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group"><label>External Customer ID</label><input type="text" name="externalcustomerid" value="{{ sub.externalcustomerid|default:'' }}"></div>
+                                    <div class="form-group"><label>External Payment ID</label><input type="text" name="externalpaymentid" value="{{ sub.externalpaymentid|default:'' }}"></div>
+                                    <button type="submit" class="btn-add">Save</button>
+                                    <button type="button" class="btn-cancel" onclick="toggleRow('sub-edit-{{ sub.id }}')">Cancel</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="empty-message">No subscriptions yet.</p>
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- App Release Versions -->
+            <section id="section-app-release-versions" class="admin-section{% if active_section == 'app-release-versions' %} active{% endif %}">
+                <h2 class="page-heading">App Release Versions</h2>
+                <div class="card">
+                    <h3 class="section-title">Add Release Version</h3>
+                    <form method="post" class="add-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="add_app_release_version">
+                        <div class="form-group">
+                            <label>Release Version Number</label>
+                            <input type="text" name="releaseVersionNumber" required maxlength="50">
+                        </div>
+                        <div class="form-group">
+                            <label>Optional Upgrade Version Number</label>
+                            <input type="text" name="optionUpgradeVersionNumber" maxlength="50">
+                        </div>
+                        <div class="form-group">
+                            <label>Mandatory Upgrade Version Number</label>
+                            <input type="text" name="mandatoryUpgradeVersionNumber" maxlength="50">
+                        </div>
+                        <button type="submit" class="btn-add">Add Release Version</button>
+                    </form>
+
+                    {% if app_release_versions %}
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Release Version</th>
+                                <th>Optional Upgrade</th>
+                                <th>Mandatory Upgrade</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for release in app_release_versions %}
+                        <tr>
+                            <td>{{ release.releaseVersionNumber }}</td>
+                            <td>{{ release.optionUpgradeVersionNumber|default:"—" }}</td>
+                            <td>{{ release.mandatoryUpgradeVersionNumber|default:"—" }}</td>
+                            <td>{{ release.created|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                <button type="button" class="btn-edit" onclick="toggleRow('release-edit-{{ release.id }}')">Edit</button>
+                                <form method="post" style="display:inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="delete_app_release_version">
+                                    <input type="hidden" name="release_id" value="{{ release.id }}">
+                                    <button type="submit" class="btn-remove" onclick="return confirm('Delete this release version?');">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        <tr id="release-edit-{{ release.id }}" class="edit-row">
+                            <td colspan="5">
+                                <form method="post" class="add-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="edit_app_release_version">
+                                    <input type="hidden" name="release_id" value="{{ release.id }}">
+                                    <div class="form-group">
+                                        <label>Release Version Number</label>
+                                        <input type="text" name="releaseVersionNumber" value="{{ release.releaseVersionNumber }}" required maxlength="50">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Optional Upgrade Version Number</label>
+                                        <input type="text" name="optionUpgradeVersionNumber" value="{{ release.optionUpgradeVersionNumber|default:'' }}" maxlength="50">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Mandatory Upgrade Version Number</label>
+                                        <input type="text" name="mandatoryUpgradeVersionNumber" value="{{ release.mandatoryUpgradeVersionNumber|default:'' }}" maxlength="50">
+                                    </div>
+                                    <button type="submit" class="btn-add">Save</button>
+                                    <button type="button" class="btn-cancel" onclick="toggleRow('release-edit-{{ release.id }}')">Cancel</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="empty-message">No app release versions yet.</p>
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- Terms & Conditions -->
+            <section id="section-terms-and-conditions" class="admin-section{% if active_section == 'terms-and-conditions' %} active{% endif %}">
+                <h2 class="page-heading">Terms &amp; Conditions</h2>
+                <div class="card">
+                    <h3 class="section-title">Add Terms Version</h3>
+                    <form method="post" class="add-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="add_terms">
+                        <div class="form-group">
+                            <label>Document Type</label>
+                            <input type="text" name="document_type" value="app" maxlength="50" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Version Number</label>
+                            <input type="text" name="version_number" required maxlength="20" placeholder="e.g. 1.0">
+                        </div>
+                        <div class="form-group">
+                            <label>Title</label>
+                            <input type="text" name="title" required maxlength="200">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>Content</label>
+                            <textarea name="content" required rows="8"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Effective From</label>
+                            <input type="datetime-local" name="effective_from">
+                        </div>
+                        <div class="form-group">
+                            <label>Current Version</label>
+                            <select name="is_current">
+                                <option value="false" selected>No</option>
+                                <option value="true">Yes</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-add">Add Terms Version</button>
+                    </form>
+
+                    {% if terms_and_conditions %}
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Document Type</th>
+                                <th>Version</th>
+                                <th>Title</th>
+                                <th>Current</th>
+                                <th>Effective From</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for terms in terms_and_conditions %}
+                        <tr>
+                            <td>{{ terms.document_type }}</td>
+                            <td>{{ terms.version_number }}</td>
+                            <td>{{ terms.title }}</td>
+                            <td>{% if terms.is_current %}Yes{% else %}No{% endif %}</td>
+                            <td>{% if terms.effective_from %}{{ terms.effective_from|date:"Y-m-d H:i" }}{% else %}—{% endif %}</td>
+                            <td>{{ terms.created|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                <button type="button" class="btn-edit" onclick="toggleRow('terms-edit-{{ terms.id }}')">Edit</button>
+                                <form method="post" style="display:inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="delete_terms">
+                                    <input type="hidden" name="terms_id" value="{{ terms.id }}">
+                                    <button type="submit" class="btn-remove" onclick="return confirm('Delete this terms version?');">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        <tr id="terms-edit-{{ terms.id }}" class="edit-row">
+                            <td colspan="7">
+                                <form method="post" class="add-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="edit_terms">
+                                    <input type="hidden" name="terms_id" value="{{ terms.id }}">
+                                    <div class="form-group">
+                                        <label>Document Type</label>
+                                        <input type="text" name="document_type" value="{{ terms.document_type }}" maxlength="50" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Version Number</label>
+                                        <input type="text" name="version_number" value="{{ terms.version_number }}" required maxlength="20">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Title</label>
+                                        <input type="text" name="title" value="{{ terms.title }}" required maxlength="200">
+                                    </div>
+                                    <div class="form-group full-width">
+                                        <label>Content</label>
+                                        <textarea name="content" required rows="8">{{ terms.content }}</textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Effective From</label>
+                                        <input type="datetime-local" name="effective_from" value="{% if terms.effective_from %}{{ terms.effective_from|date:'Y-m-d' }}T{{ terms.effective_from|time:'H:i' }}{% endif %}">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Current Version</label>
+                                        <select name="is_current">
+                                            <option value="true"{% if terms.is_current %} selected{% endif %}>Yes</option>
+                                            <option value="false"{% if not terms.is_current %} selected{% endif %}>No</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="btn-add">Save</button>
+                                    <button type="button" class="btn-cancel" onclick="toggleRow('terms-edit-{{ terms.id }}')">Cancel</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="empty-message">No terms and conditions versions yet.</p>
+                    {% endif %}
+                </div>
+            </section>
+
+        </div>
+    </main>
+</div>
+
+<script>
+function toggleRow(rowId) {
+    const row = document.getElementById(rowId);
+    const isActive = row.classList.contains('active');
+    document.querySelectorAll('.edit-row.active').forEach(r => r.classList.remove('active'));
+    if (!isActive) row.classList.add('active');
+}
+
+function showSection(sectionId) {
+    document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.sidebar .nav-link').forEach(l => l.classList.remove('active'));
+    const section = document.getElementById('section-' + sectionId);
+    const link = document.querySelector('.sidebar .nav-link[data-section="' + sectionId + '"]');
+    if (section) section.classList.add('active');
+    if (link) link.classList.add('active');
+}
+
+document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+    link.addEventListener('click', function(event) {
+        event.preventDefault();
+        const sectionId = this.dataset.section;
+        showSection(sectionId);
+        const url = new URL(window.location.href);
+        url.searchParams.set('section', sectionId);
+        window.history.replaceState({}, '', url);
+    });
+});
+</script>
+
+{% endblock %}

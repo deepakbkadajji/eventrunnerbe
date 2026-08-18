@@ -5,9 +5,32 @@ from django.contrib.auth import views as auth_views
 urlpatterns = [
     path('', views.home, name='home'),
     path('userhome/', views.userhome, name='userhome'),
+    path('administrator/', views.administrator, name='administrator'),
+    path(
+        'athletic-associations/',
+        views.athletic_associations,
+        name='athletic_associations'
+    ),
+    path(
+        'athletic-organisations/',
+        views.athletic_organisations,
+        name='athletic_organisations'
+    ),
+    path(
+        'athletic-organisations/<int:id>/',
+        views.athletic_organisation_details,
+        name='athletic_organisation_details'
+    ),
     path('about/', views.about, name='about'),
     path('events/', views.events, name='events'),
+    path('organisations/', views.organisations, name='organisations'),
+    path(
+        'organisations/<int:id>/',
+        views.organisation_details,
+        name='organisation_details'
+    ),
     path('events/new-event/', views.new_event, name='new_event'),
+    path('events/new/', views.event_create, name='event_create'),
     path(
         'events/<int:id>/', 
         views.event_details, 
@@ -18,6 +41,14 @@ urlpatterns = [
         name='event_details_edit'),
     #path("login2/", views.login_view, name="login"),
     path(
+        'events/edit/<int:id>/', 
+        views.event_details_editpage, 
+        name='event_details_editpage'),
+    path(
+        'events/new/', 
+        views.event_details_newpage, 
+        name='event_details_newpage'),
+    path(
         'participants/',
         views.participants,
         name='participants'
@@ -27,6 +58,11 @@ urlpatterns = [
         'participants/<int:id>/',
         views.participant_details,
         name='participant_details'
+    ),
+    path(
+        'participants/edit/<int:id>/',
+        views.participant_details_edit,
+        name='participant_details_edit'
     ),
     path(
         'event_participants/<int:id>/', 

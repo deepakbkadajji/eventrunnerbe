@@ -1,0 +1,394 @@
+{% extends 'website/basepage.html' %}
+
+{% block title %}
+Athletic Organisations
+{% endblock %}
+
+{% block content %}
+
+
+<div class="page-shell">
+<div class="page-container">
+
+    <div class="content-header">
+        <div class="content-header-text">
+            <h1>Athletic Organisations</h1>
+            <p>Manage the athletic organisation hierarchy.</p>
+        </div>
+    </div>
+
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li class="{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <div class="card">
+        <h2 class="section-title">Add Root Organisation</h2>
+
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_root">
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="root-code">Code</label>
+                    <input type="text" id="root-code" name="code" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="root-name">Name</label>
+                    <input type="text" id="root-name" name="name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="root-organisationtype">Organisation Type</label>
+                    <select id="root-organisationtype" name="organisationtype" required>
+                        <option value="">Select type...</option>
+                        {% for value, label in organisation_types %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="root-registrationnumber">Registration Number</label>
+                    <input type="text" id="root-registrationnumber" name="registrationnumber">
+                </div>
+
+                <div class="form-group">
+                    <label for="root-countrycode">Country Code</label>
+                    <input type="text" id="root-countrycode" name="countrycode">
+                </div>
+
+                <div class="form-group">
+                    <label for="root-city">City</label>
+                    <input type="text" id="root-city" name="city">
+                </div>
+
+                <button type="submit" class="btn-add">Add Root</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="view-toolbar">
+            <h2 class="section-title" style="margin-bottom:0;border-bottom:none;padding-bottom:0;">Organisation Hierarchy</h2>
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                <div class="view-toggle">
+                    <button type="button" id="btn-list-view" class="active" onclick="setHierarchyView('list')">List View</button>
+                    <button type="button" id="btn-tree-view" onclick="setHierarchyView('tree')">Tree View</button>
+                </div>
+                <div class="tree-toolbar" id="tree-toolbar" style="display:none;">
+                    <button type="button" class="btn-tree-action" onclick="expandAllTreeNodes()">Expand All</button>
+                    <button type="button" class="btn-tree-action" onclick="collapseAllTreeNodes()">Collapse All</button>
+                </div>
+            </div>
+        </div>
+
+        {% if organisations %}
+        <div id="hierarchy-list-view" class="hierarchy-view active">
+        <ul class="tree-list">
+            {% for organisation in organisations %}
+            <li class="tree-item" data-depth="{{ organisation.depth }}">
+                <div class="tree-item-header">
+                    <div>
+                        <div class="tree-item-title">
+                            <span class="depth-badge">Level {{ organisation.depth }}</span>
+                            <span class="type-badge">{{ organisation.get_organisationtype_display }}</span>
+                            {{ organisation.name }}
+                        </div>
+                        <div class="tree-item-meta">
+                            <strong>Code:</strong> {{ organisation.code }}
+                        </div>
+                        {% if organisation.registrationnumber %}
+                        <div class="tree-item-meta">
+                            <strong>Registration:</strong> {{ organisation.registrationnumber }}
+                        </div>
+                        {% endif %}
+                        {% if organisation.city or organisation.countrycode %}
+                        <div class="tree-item-meta">
+                            <strong>Location:</strong>
+                            {% if organisation.city %}{{ organisation.city }}{% endif %}
+                            {% if organisation.countrycode %}{% if organisation.city %}, {% endif %}{{ organisation.countrycode }}{% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="tree-actions">
+                        <a href="{% url 'athletic_organisation_details' organisation.id %}" class="btn-edit" style="text-decoration:none;display:inline-block;">
+                            View Details
+                        </a>
+                        <button type="button" class="btn-child" onclick="togglePanel('child-{{ organisation.id }}')">
+                            Add Child
+                        </button>
+                        <button type="button" class="btn-edit" onclick="togglePanel('edit-{{ organisation.id }}')">
+                            Edit
+                        </button>
+                        <button type="button" class="btn-move" onclick="togglePanel('move-{{ organisation.id }}')">
+                            Move
+                        </button>
+                        <form method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="organisation_id" value="{{ organisation.id }}">
+                            <button
+                                type="submit"
+                                class="btn-remove"
+                                onclick="return confirm('Delete this organisation and all its children?');">
+                                Delete
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div id="child-{{ organisation.id }}" class="edit-panel">
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="add_child">
+                        <input type="hidden" name="parent_id" value="{{ organisation.id }}">
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Code</label>
+                                <input type="text" name="code" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Name</label>
+                                <input type="text" name="name" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Organisation Type</label>
+                                <select name="organisationtype" required>
+                                    <option value="">Select type...</option>
+                                    {% for value, label in organisation_types %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Registration Number</label>
+                                <input type="text" name="registrationnumber">
+                            </div>
+
+                            <button type="submit" class="btn-add">Save Child</button>
+                            <button type="button" class="btn-cancel" onclick="togglePanel('child-{{ organisation.id }}')">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <div id="edit-{{ organisation.id }}" class="edit-panel">
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="edit">
+                        <input type="hidden" name="organisation_id" value="{{ organisation.id }}">
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Code</label>
+                                <input type="text" name="code" value="{{ organisation.code }}" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Name</label>
+                                <input type="text" name="name" value="{{ organisation.name }}" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Organisation Type</label>
+                                <select name="organisationtype" required>
+                                    {% for value, label in organisation_types %}
+                                    <option value="{{ value }}"{% if organisation.organisationtype == value %} selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Registration Number</label>
+                                <input type="text" name="registrationnumber" value="{{ organisation.registrationnumber|default:'' }}">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Country Code</label>
+                                <input type="text" name="countrycode" value="{{ organisation.countrycode|default:'' }}">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Province</label>
+                                <input type="text" name="province" value="{{ organisation.province|default:'' }}">
+                            </div>
+
+                            <div class="form-group">
+                                <label>City</label>
+                                <input type="text" name="city" value="{{ organisation.city|default:'' }}">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Contact Email</label>
+                                <input type="email" name="contactemail" value="{{ organisation.contactemail|default:'' }}">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Website URL</label>
+                                <input type="text" name="websiteurl" value="{{ organisation.websiteurl|default:'' }}">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Active</label>
+                                <select name="isactive">
+                                    <option value="true"{% if organisation.isactive %} selected{% endif %}>Yes</option>
+                                    <option value="false"{% if not organisation.isactive %} selected{% endif %}>No</option>
+                                </select>
+                            </div>
+
+                            <button type="submit" class="btn-add">Save Changes</button>
+                            <button type="button" class="btn-cancel" onclick="togglePanel('edit-{{ organisation.id }}')">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <div id="move-{{ organisation.id }}" class="edit-panel">
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="move">
+                        <input type="hidden" name="organisation_id" value="{{ organisation.id }}">
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Target Parent</label>
+                                <select name="target_parent_id">
+                                    <option value="">Move to root level</option>
+                                    {% for target in move_targets %}
+                                    {% if target.id != organisation.id %}
+                                    <option value="{{ target.id }}">
+                                        {{ target.name }} ({{ target.get_organisationtype_display }})
+                                    </option>
+                                    {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Position</label>
+                                <select name="position">
+                                    {% for value, label in move_positions %}
+                                    <option value="{{ value }}"{% if value == 'sorted-child' %} selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <button type="submit" class="btn-add">Move Organisation</button>
+                            <button type="button" class="btn-cancel" onclick="togglePanel('move-{{ organisation.id }}')">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        </div>
+
+        <div id="hierarchy-tree-view" class="hierarchy-view">
+            <ul class="org-tree-root">
+                {% for node in organisation_tree %}
+                {% include "website/athletic-organisation-tree-node.html" with node=node %}
+                {% endfor %}
+            </ul>
+        </div>
+        {% else %}
+        <p class="empty-message">No athletic organisations yet. Add a root organisation above.</p>
+        {% endif %}
+    </div>
+
+</div>
+</div>
+
+<script>
+function togglePanel(panelId) {
+    const panel = document.getElementById(panelId);
+    const isActive = panel.classList.contains('active');
+
+    document.querySelectorAll('.edit-panel.active').forEach(item => {
+        item.classList.remove('active');
+    });
+
+    if (!isActive) {
+        panel.classList.add('active');
+    }
+}
+
+function setHierarchyView(view) {
+    const listView = document.getElementById('hierarchy-list-view');
+    const treeView = document.getElementById('hierarchy-tree-view');
+    const listBtn = document.getElementById('btn-list-view');
+    const treeBtn = document.getElementById('btn-tree-view');
+    const treeToolbar = document.getElementById('tree-toolbar');
+
+    if (!listView || !treeView) {
+        return;
+    }
+
+    const isTree = view === 'tree';
+    listView.classList.toggle('active', !isTree);
+    treeView.classList.toggle('active', isTree);
+    listBtn.classList.toggle('active', !isTree);
+    treeBtn.classList.toggle('active', isTree);
+    if (treeToolbar) {
+        treeToolbar.style.display = isTree ? 'flex' : 'none';
+    }
+    localStorage.setItem('athleticOrgHierarchyView', view);
+}
+
+function toggleTreeNode(button) {
+    const children = button.closest('.org-tree-node').querySelector(':scope > .org-tree-children');
+    if (!children) {
+        return;
+    }
+
+    const expanded = button.classList.toggle('expanded');
+    children.classList.toggle('collapsed', !expanded);
+}
+
+function expandAllTreeNodes() {
+    document.querySelectorAll('#hierarchy-tree-view .tree-toggle').forEach(button => {
+        button.classList.add('expanded');
+        const children = button.closest('.org-tree-node').querySelector(':scope > .org-tree-children');
+        if (children) {
+            children.classList.remove('collapsed');
+        }
+    });
+}
+
+function collapseAllTreeNodes() {
+    document.querySelectorAll('#hierarchy-tree-view .tree-toggle').forEach(button => {
+        button.classList.remove('expanded');
+        const children = button.closest('.org-tree-node').querySelector(':scope > .org-tree-children');
+        if (children) {
+            children.classList.add('collapsed');
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const savedView = localStorage.getItem('athleticOrgHierarchyView');
+    if (savedView === 'tree') {
+        setHierarchyView('tree');
+    }
+});
+</script>
+
+{% endblock %}
