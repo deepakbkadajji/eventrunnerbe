@@ -27,7 +27,9 @@ from .serializers import EventImageSerializer
 from .models import EventImages
 
 from .serializers import EventNotificationSerializer
+from .serializers import OrganisationNotificationSerializer
 from .models import EventNotificationTable
+from .models import OrganisationNotificationTable
 
 from .serializers import EventSponsorSerializer
 from .models import EventSponsorTable
@@ -183,6 +185,17 @@ def _build_participant_terms_status(participant, document_type='app'):
         'last_accepted_version': last_acceptance.terms.version_number if last_acceptance else None,
         'last_accepted_at': last_acceptance.accepted_at if last_acceptance else None,
     }
+
+
+def _participant_detail_queryset():
+    return ParticipantTable.objects.prefetch_related(
+        Prefetch(
+            'athleticorganisationmember_participant',
+            queryset=AthleticOrganisationMemberTable.objects.filter(
+                status=OrganisationMemberStatus.Active,
+            ).select_related('athleticorganisation'),
+        ),
+    )
 
 
 ATHLETIC_ORGANISATION_MOVE_POSITIONS = {
@@ -776,19 +789,12 @@ class participantCheckViewSet(ModelViewSet):
             return  Response(participantserializer.data)
         
 class participantViewSet(ModelViewSet):
-    queryset = ParticipantTable.objects.prefetch_related(
-        Prefetch(
-            'athleticorganisationmember_participant',
-            queryset=AthleticOrganisationMemberTable.objects.filter(
-                status=OrganisationMemberStatus.Active,
-            ).select_related('athleticorganisation'),
-        ),
-    )
+    queryset = _participant_detail_queryset()
     serializer_class = ParticipantSerializer
     parser_classes = (MultiPartParser , FormParser , JSONParser)
 
     def get_serializer_class(self):
-        if self.action in ('list', 'retrieve', 'update', 'partial_update'):
+        if self.action in ('list', 'retrieve', 'update', 'partial_update', 'lookup_by_email'):
             return ParticipantDetailSerializer
         return ParticipantSerializer
 
@@ -797,14 +803,7 @@ class participantViewSet(ModelViewSet):
         participantAuthid = request.data['authid']
         reqType = request.data['reqtype']  
         
-        participant = ParticipantTable.objects.prefetch_related(
-            Prefetch(
-                'athleticorganisationmember_participant',
-                queryset=AthleticOrganisationMemberTable.objects.filter(
-                    status=OrganisationMemberStatus.Active,
-                ).select_related('athleticorganisation'),
-            ),
-        ).get(emailaddress = participantEmailAddr)
+        participant = _participant_detail_queryset().get(emailaddress = participantEmailAddr)
         #participant = ParticipantTable.objects.get(authid = participantAuthid)
         if  reqType == 'check':
             if (participant.emailaddress):
@@ -815,37 +814,26 @@ class participantViewSet(ModelViewSet):
         else:
             participantserializer = ParticipantDetailSerializer(participant , many=False)
             return  Response(participantserializer.data, status=status.HTTP_200_OK)
-        
-    def list(self , request  , *args, **kwargs):
 
-
-        body_unicode = request.body.decode('utf-8')
-        body = json.loads(body_unicode) 
-        participantEmailAddr = body['emailaddress']
-        participantAuthid = body['authid']
-        reqType = body['reqtype'] 
+    @action(detail=False, methods=['post'], url_path='lookup-by-email')
+    def lookup_by_email(self, request):
+        body = _parse_request_body(request)
+        participant_email = body.get('emailaddress')
+        if not participant_email:
+            return Response(
+                {'detail': 'emailaddress is required in request body.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
-            participant = ParticipantTable.objects.prefetch_related(
-            Prefetch(
-                'athleticorganisationmember_participant',
-                queryset=AthleticOrganisationMemberTable.objects.filter(
-                    status=OrganisationMemberStatus.Active,
-                ).select_related('athleticorganisation'),
-            ),
-        ).get(emailaddress = participantEmailAddr)
-            #participant = ParticipantTable.objects.get(authid = participantAuthid)
+            participant = _participant_detail_queryset().get(emailaddress=participant_email)
         except ParticipantTable.DoesNotExist:
-            return Response("", status=status.HTTP_204_NO_CONTENT)
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
-        participantserializer = ParticipantDetailSerializer(participant , many=False)
-        return  Response(participantserializer.data, status=status.HTTP_200_OK)
-
-        #if  reqType == 'check':
-        #    return  Response(participant.id, status=status.HTTP_200_OK)
-        #else:
-        #    participantserializer = ParticipantDetailSerializer(participant , many=False)
-        #    return  Response(participantserializer.data, status=status.HTTP_200_OK)
+        return Response(
+            ParticipantDetailSerializer(participant).data,
+            status=status.HTTP_200_OK,
+        )
         
     def create(self , request  , *args, **kwargs):
 
@@ -1278,6 +1266,40 @@ class EventNotificationViewSet(ModelViewSet):
             eventNotificationserializer = EventNotificationSerializer(eventnotificationtTable , many=True)  
 
         return  Response(eventNotificationserializer.data, status=status.HTTP_200_OK)
+
+
+def _organisation_notifications_from_body(body):
+    queryset = OrganisationNotificationTable.objects.select_related(
+        'athleticorganisation',
+        'event',
+    ).order_by('-created')
+
+    if 'id' in body:
+        return queryset.filter(id=body['id']), False
+    if 'athleticorganisation' in body:
+        return queryset.filter(athleticorganisation_id=body['athleticorganisation']), True
+    return queryset, True
+
+
+class OrganisationNotificationViewSet(ModelViewSet):
+    queryset = OrganisationNotificationTable.objects.select_related(
+        'athleticorganisation',
+        'event',
+    ).order_by('-created')
+    serializer_class = OrganisationNotificationSerializer
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
+
+    def retrieve(self, request, *args, **kwargs):
+        body = _parse_request_body(request)
+        notifications, many = _organisation_notifications_from_body(body)
+        serializer = OrganisationNotificationSerializer(notifications, many=many)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def list(self, request, *args, **kwargs):
+        body = _parse_request_body(request)
+        notifications, many = _organisation_notifications_from_body(body)
+        serializer = OrganisationNotificationSerializer(notifications, many=many)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     
 
 class EventSponsorViewSet(ModelViewSet):

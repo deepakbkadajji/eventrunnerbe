@@ -324,6 +324,39 @@ a { color: var(--primary); }
     letter-spacing: -0.02em;
 }
 
+.section-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.section-header-row .page-heading {
+    margin: 0;
+}
+
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+}
+
+.pagination-info {
+    color: var(--text-muted, #64748b);
+    font-size: 14px;
+}
+
+.pagination-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .content-header-text p {
     margin: 0;
     color: var(--muted);

@@ -143,3 +143,12 @@ class SubscriptionStatus(IntEnum):
   @classmethod
   def choices(cls):
     return [(key.value, key.name) for key in cls]
+
+
+class OrganisationNotificationAudience(IntEnum):
+  OrganisationMembersOnly = 0
+  Everyone = 1
+
+  @classmethod
+  def choices(cls):
+    return [(key.value, key.name) for key in cls]

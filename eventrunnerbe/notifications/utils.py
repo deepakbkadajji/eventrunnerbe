@@ -1,6 +1,8 @@
 import requests
 from django.conf import settings
 
+from api.util import OrganisationNotificationAudience
+
 def send_push_notification(title , subtitle, message, event_id , notification_id, image_url = None):
     headers = {
         "Authorization": f"Basic {settings.ONESIGNAL_API_KEY}",
@@ -40,7 +42,60 @@ def send_push_notification(title , subtitle, message, event_id , notification_id
             "error": response.status_code,
             "details": response.json()
         }
-    
+
+
+def send_organisation_push_notification(
+    title,
+    subtitle,
+    message,
+    athleticorganisation_id,
+    notification_id,
+    notification_audience,
+    event_id=None,
+    image_url=None,
+):
+    headers = {
+        "Authorization": f"Basic {settings.ONESIGNAL_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    data = {
+        "athleticorganisation_id": athleticorganisation_id,
+        "organisation_notification_id": notification_id,
+        "notification_type": "organisation",
+    }
+    if event_id:
+        data["event_id"] = event_id
+
+    payload = {
+        "app_id": settings.ONESIGNAL_APP_ID,
+        "headings": {"en": title},
+        "contents": {"en": message},
+        "big_picture": image_url if image_url else None,
+        "ios_attachments": {"id": image_url if image_url else None},
+        "data": data,
+    }
+
+    if notification_audience == OrganisationNotificationAudience.OrganisationMembersOnly:
+        payload["filters"] = [
+            {
+                "field": "tag",
+                "relation": "=",
+                "key": f"athleticorganisation_{athleticorganisation_id}",
+                "value": "member",
+            }
+        ]
+    else:
+        payload["included_segments"] = ["Total Subscriptions"]
+
+    response = requests.post(settings.ONESIGNAL_API_URL, json=payload, headers=headers)
+
+    if response.status_code == 200:
+        return response.json()
+    return {
+        "error": response.status_code,
+        "details": response.json(),
+    }
 
 
 
@@ -146,6 +201,28 @@ def update_user(external_id , event_id):
     response = requests.patch(url, json=payload, headers=headers)
 
     print(response.text)
+
+
+def update_user_athletic_organisation(external_id, athleticorganisation_id, is_member=True):
+    appid = settings.ONESIGNAL_APP_ID
+    extIdStr = f"{external_id}"
+    url = f"https://api.onesignal.com/apps/{appid}/users/by/external_id/{extIdStr}"
+
+    tag_key = f"athleticorganisation_{athleticorganisation_id}"
+    payload = {
+        "properties": {
+            "tags": {tag_key: "member" if is_member else ""},
+        }
+    }
+    headers = {
+        "Authorization": f"Key {settings.ONESIGNAL_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    response = requests.patch(url, json=payload, headers=headers)
+
+    print(response.text)
+
 
 def create_segment(event_id):
 

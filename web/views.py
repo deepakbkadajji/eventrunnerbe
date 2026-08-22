@@ -8,6 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.views.decorators.http import require_http_methods
 from django.db.models.deletion import ProtectedError
+from django.core.paginator import Paginator
 from api.models import ParticipantTable
 from api.models import ParticipantEventTable
 from api.models import EventDetailTable
@@ -28,9 +29,11 @@ from api.models import SubscriptionPlanTable
 from api.models import SubscriptionTable
 from api.models import AppReleaseVersionTable
 from api.models import TermsAndConditionsTable
+from api.models import OrganisationNotificationTable
 from api.util import OrganisationMemberRole, OrganisationMemberStatus, OrganisationType
 from api.util import EventStatus, SponsorCategory, Gender
 from api.util import SubscriberType, BillingFrequency, SubscriptionStatus
+from api.util import OrganisationNotificationAudience
 from api.subscription_validation import (
     validate_club_can_create_event,
     new_event_status_choices,
@@ -654,6 +657,9 @@ def athletic_organisations(request):
     )
 
 
+ATHLETIC_ORG_NOTIFICATIONS_PER_PAGE = 10
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def athletic_organisation_details(request, id):
@@ -790,6 +796,44 @@ def athletic_organisation_details(request, id):
                 category_link.save()
                 messages.success(request, "Athletics category updated.")
 
+        elif action == "add_organisation_notification":
+            title = request.POST.get("title", "").strip()
+            message = request.POST.get("message", "").strip()
+            if not title or not message:
+                messages.error(request, "Title and message are required.")
+                return redirect(
+                    f"{reverse('athletic_organisation_details', kwargs={'id': organisation.id})}#notifications"
+                )
+            event = None
+            event_id = request.POST.get("event")
+            if event_id:
+                event = EventDetailTable.objects.filter(
+                    id=event_id,
+                    athleticorganisation=organisation,
+                ).first()
+                if not event:
+                    messages.error(request, "Please select a valid event for this organisation.")
+                    return redirect(
+                        f"{reverse('athletic_organisation_details', kwargs={'id': organisation.id})}#notifications"
+                    )
+            OrganisationNotificationTable.objects.create(
+                athleticorganisation=organisation,
+                event=event,
+                title=title,
+                message=message,
+                notificationImg=request.FILES.get("notificationImg"),
+                notification_audience=int(
+                    request.POST.get(
+                        "notification_audience",
+                        OrganisationNotificationAudience.Everyone,
+                    )
+                ),
+            )
+            messages.success(request, "Notification sent.")
+            return redirect(
+                f"{reverse('athletic_organisation_details', kwargs={'id': organisation.id})}?notification_page=1#notifications"
+            )
+
         return redirect("athletic_organisation_details", id=organisation.id)
 
     organisation_members = AthleticOrganisationMemberTable.objects.filter(
@@ -802,6 +846,16 @@ def athletic_organisation_details(request, id):
     member_participant_ids = organisation_members.values_list("participant_id", flat=True)
     linked_category_ids = organisation_categories.values_list("athleticscategory_id", flat=True)
 
+    organisation_events = EventDetailTable.objects.filter(
+        athleticorganisation=organisation,
+    ).order_by("-eventdate")
+
+    notifications_qs = OrganisationNotificationTable.objects.filter(
+        athleticorganisation=organisation,
+    ).select_related("event").order_by("-created")
+    notifications_paginator = Paginator(notifications_qs, ATHLETIC_ORG_NOTIFICATIONS_PER_PAGE)
+    notifications_page = notifications_paginator.get_page(request.GET.get("notification_page"))
+
     return render(
         request,
         "website/athletic-organisation-details.html",
@@ -810,6 +864,9 @@ def athletic_organisation_details(request, id):
             "parent": parent,
             "organisation_members": organisation_members,
             "organisation_categories": organisation_categories,
+            "notifications_page": notifications_page,
+            "organisation_events": organisation_events,
+            "notification_audiences": OrganisationNotificationAudience.choices(),
             "available_participants": ParticipantTable.objects.exclude(
                 id__in=member_participant_ids,
             ).order_by("surname", "firstname"),
@@ -962,6 +1019,7 @@ def new_event(request):
     return redirect("event_create")
     
 @login_required
+@require_http_methods(["GET", "POST"])
 def event_details(request, id):
     event = get_object_or_404(
         EventDetailTable.objects.select_related(
@@ -969,6 +1027,17 @@ def event_details(request, id):
         ),
         id=id,
     )
+
+    if request.method == "POST" and request.POST.get("action") == "add_notification":
+        EventNotificationTable.objects.create(
+            event=event,
+            title=request.POST.get("title") or None,
+            message=request.POST.get("message") or None,
+            notificationImg=request.FILES.get("notificationImg"),
+            notificationPdf=request.FILES.get("notificationPdf"),
+        )
+        messages.success(request, "Notification added.")
+        return redirect(f"{reverse('event_details', kwargs={'id': event.id})}?section=notifications")
 
     event_image = EventImages.objects.filter(event=event).first()
     sponsors = EventSponsorTable.objects.filter(event=event).order_by("id")

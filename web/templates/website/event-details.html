@@ -33,6 +33,14 @@
     <main class="content">
         <div class="content-inner">
 
+            {% if messages %}
+            <ul class="messages">
+                {% for message in messages %}
+                <li class="{{ message.tags }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+
             <!-- Event Details -->
             <section id="section-details" class="detail-section{% if active_section == 'details' %} active{% endif %}">
                 <h1 class="page-heading">Event Details</h1>
@@ -201,8 +209,22 @@
 
             <!-- Notifications -->
             <section id="section-notifications" class="detail-section{% if active_section == 'notifications' %} active{% endif %}">
-                <h1 class="page-heading">Event Notifications</h1>
+                <div class="section-header-row">
+                    <h1 class="page-heading">Event Notifications</h1>
+                    <a href="{% url 'event_details_edit' event.id %}?section=notifications" class="btn btn-edit">Edit Notifications</a>
+                </div>
                 <div class="card">
+                    <h2 class="section-title">Add Notification</h2>
+                    <form method="post" enctype="multipart/form-data" class="add-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="add_notification">
+                        <div class="form-group"><label>Title</label><input type="text" name="title" maxlength="50"></div>
+                        <div class="form-group"><label>Message</label><input type="text" name="message" maxlength="255"></div>
+                        <div class="form-group"><label>Image</label><input type="file" name="notificationImg" accept="image/*"></div>
+                        <div class="form-group"><label>PDF</label><input type="file" name="notificationPdf" accept="application/pdf,.pdf"></div>
+                        <button type="submit" class="btn-add">Add Notification</button>
+                    </form>
+
                     <h2 class="section-title">Notifications</h2>
                     {% if notifications %}
                     <table class="data-table">

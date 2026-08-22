@@ -7,6 +7,7 @@ from .models import EventSubDetailTable
 from .models import ParticipantPaymRefTable
 from .models import ParticipantEventTable
 from .models import EventNotificationTable
+from .models import OrganisationNotificationTable
 from .models import EventCategoryTable
 from .models import AthleticsCategoryTable
 from .models import AthleticAssociationTable
@@ -27,6 +28,7 @@ admin.site.register(EventSubDetailTable)
 admin.site.register(ParticipantPaymRefTable)
 admin.site.register(ParticipantEventTable)
 admin.site.register(EventNotificationTable)
+admin.site.register(OrganisationNotificationTable)
 admin.site.register(EventCategoryTable)
 admin.site.register(AthleticsCategoryTable)
 admin.site.register(AthleticAssociationTable)

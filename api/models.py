@@ -11,6 +11,7 @@ from .util import OrganisationType
 from .util import SubscriberType
 from .util import BillingFrequency
 from .util import SubscriptionStatus
+from .util import OrganisationNotificationAudience
 
 from utilities.storage_backends import PrivateMediaStorage
 from utilities.storage_backends import PublicMediaStorage
@@ -377,6 +378,39 @@ class EventNotificationTable(models.Model):
 
     def __str__(self):
         return self.event.eventname + ' ' + self.title
+
+    class Meta:
+        ordering = ['-created']
+
+class OrganisationNotificationTable(models.Model):
+    athleticorganisation = models.ForeignKey(
+        AthleticOrganisationTable,
+        on_delete=models.CASCADE,
+        related_name='organisationnotification_athleticorganisation',
+    )
+    event = models.ForeignKey(
+        EventDetailTable,
+        on_delete=models.CASCADE,
+        related_name='organisationnotification_event',
+        null=True,
+        blank=True,
+    )
+    title = models.CharField(max_length=50, null=True, blank=True)
+    message = models.CharField(max_length=255, null=True, blank=True)
+    notificationImg = models.ImageField(
+        upload_to='images/organisationNotificationImg/',
+        blank=True,
+        null=True,
+        storage=PrivateMediaStorage(),
+    )
+    notification_audience = models.IntegerField(
+        choices=OrganisationNotificationAudience.choices(),
+        default=OrganisationNotificationAudience.Everyone,
+    )
+    created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.athleticorganisation.name} - {self.title or self.id}'
 
     class Meta:
         ordering = ['-created']

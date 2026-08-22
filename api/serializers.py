@@ -7,6 +7,7 @@ from .models import ParticipantEventTable
 from .models import EventImages
 from .models import EventSubDetailTable
 from .models import EventNotificationTable
+from .models import OrganisationNotificationTable
 from .models import EventSponsorTable
 from .models import EventInformationTable
 from .models import OrganisationTable
@@ -65,6 +66,31 @@ class EventNotificationSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'event', 'title', 'message', 'notificationImg', 'notificationPdf',
             'event_name', 'created',
+        ]
+        read_only_fields = ['created']
+
+class OrganisationNotificationSerializer(serializers.ModelSerializer):
+    athleticorganisation_name = serializers.ReadOnlyField(source='athleticorganisation.name')
+    event_name = serializers.ReadOnlyField(source='event.eventname')
+    notification_audience_label = serializers.CharField(
+        source='get_notification_audience_display',
+        read_only=True,
+    )
+
+    class Meta:
+        model = OrganisationNotificationTable
+        fields = [
+            'id',
+            'athleticorganisation',
+            'athleticorganisation_name',
+            'event',
+            'event_name',
+            'title',
+            'message',
+            'notificationImg',
+            'notification_audience',
+            'notification_audience_label',
+            'created',
         ]
         read_only_fields = ['created']
 

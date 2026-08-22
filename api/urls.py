@@ -18,6 +18,7 @@ router.register('subevents' , views.EventSubViewSet)
 router.register('paymconfirminfo' , views.participantPaymViewSet)   
 router.register('eventmodel' , views.eventViewSet , basename='eventmodel')
 router.register('eventnotifications' , views.EventNotificationViewSet)
+router.register('organisationnotifications', views.OrganisationNotificationViewSet)
 router.register('eventsponsors' , views.EventSponsorViewSet)
 router.register('appsponsors' , views.AppSponsorViewSet)
 router.register('eventinformation' , views.eventInfoViewSet)
@@ -34,6 +35,11 @@ router.register('termsandconditions', views.TermsAndConditionsViewSet)
 #router.register('eventdetails' , views.EventsDetailsView , basename='eventdetails')
 
 urlpatterns = [
+    path(
+        'participantset/lookup-by-email/',
+        views.participantViewSet.as_view({'post': 'lookup_by_email'}),
+        name='participant-lookup-by-email',
+    ),
     path(
         'appreleaseversions/lookup/',
         views.AppReleaseVersionViewSet.as_view({'post': 'lookup'}),
