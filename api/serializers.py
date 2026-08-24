@@ -122,7 +122,7 @@ class EventCardSerializer(serializers.ModelSerializer):
         model = EventDetailTable
         fields = [
             'id', 'eventname', 'eventdate', 'eventenddate', 'eventimage',
-            'athleticscategory_name', 'athleticorganisation_name', 'eventstatus',
+            'athleticscategory', 'athleticscategory_name', 'athleticorganisation', 'athleticorganisation_name', 'eventstatus',
         ]
 
 
