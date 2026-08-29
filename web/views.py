@@ -46,8 +46,17 @@ from api.views import (
     _validate_athletic_organisation_required_fields,
 )
 from api.serializers import EventSubDetailSerializer , EventDetailSerializer
+from api.gpx_utils import gpx_to_encoded_polyline
 
 # Create your views here.
+
+def _apply_route_gpx_to_subevent(subevent, gpx_file):
+    gpx_file.seek(0)
+    subevent.routePolyline = gpx_to_encoded_polyline(gpx_file.read())
+    gpx_file.seek(0)
+    subevent.routeGpx = gpx_file
+
+
 def home(request):
     return render(request, 'website/home.html')
 
@@ -1028,16 +1037,38 @@ def event_details(request, id):
         id=id,
     )
 
-    if request.method == "POST" and request.POST.get("action") == "add_notification":
-        EventNotificationTable.objects.create(
-            event=event,
-            title=request.POST.get("title") or None,
-            message=request.POST.get("message") or None,
-            notificationImg=request.FILES.get("notificationImg"),
-            notificationPdf=request.FILES.get("notificationPdf"),
-        )
-        messages.success(request, "Notification added.")
-        return redirect(f"{reverse('event_details', kwargs={'id': event.id})}?section=notifications")
+    if request.method == "POST":
+        action = request.POST.get("action")
+
+        if action == "add_notification":
+            EventNotificationTable.objects.create(
+                event=event,
+                title=request.POST.get("title") or None,
+                message=request.POST.get("message") or None,
+                notificationImg=request.FILES.get("notificationImg"),
+                notificationPdf=request.FILES.get("notificationPdf"),
+            )
+            messages.success(request, "Notification added.")
+            return redirect(f"{reverse('event_details', kwargs={'id': event.id})}?section=notifications")
+
+        if action == "upload_subevent_route_gpx":
+            subevent = EventSubDetailTable.objects.filter(
+                id=request.POST.get("subevent_id"),
+                event=event,
+            ).first()
+            route_gpx = request.FILES.get("routeGpx")
+            if not subevent:
+                messages.error(request, "Subevent not found.")
+            elif not route_gpx:
+                messages.error(request, "Please select a GPX file to upload.")
+            else:
+                try:
+                    _apply_route_gpx_to_subevent(subevent, route_gpx)
+                    subevent.save()
+                    messages.success(request, "Route GPX uploaded and polyline generated.")
+                except ValueError as exc:
+                    messages.error(request, f"Could not process GPX file: {exc}")
+            return redirect(f"{reverse('event_details', kwargs={'id': event.id})}?section=categories")
 
     event_image = EventImages.objects.filter(event=event).first()
     sponsors = EventSponsorTable.objects.filter(event=event).order_by("id")
@@ -1388,7 +1419,7 @@ def event_details_edit(request, id):
             if not category_id:
                 messages.error(request, "Please select a category.")
             else:
-                EventSubDetailTable.objects.create(
+                subevent = EventSubDetailTable.objects.create(
                     event=event,
                     eventcategory_id=category_id,
                     name=request.POST.get("name", ""),
@@ -1398,6 +1429,16 @@ def event_details_edit(request, id):
                     displaysequence=int(request.POST.get("displaysequence") or 0),
                     elevationImg=request.FILES.get("elevationImg"),
                 )
+                route_gpx = request.FILES.get("routeGpx")
+                if route_gpx:
+                    try:
+                        _apply_route_gpx_to_subevent(subevent, route_gpx)
+                        subevent.save()
+                    except ValueError as exc:
+                        messages.warning(
+                            request,
+                            f"Subevent added, but route GPX could not be processed: {exc}",
+                        )
                 messages.success(request, "Subevent added.")
 
         elif action == "edit_subevent":
@@ -1411,6 +1452,15 @@ def event_details_edit(request, id):
                 subevent.displaysequence = int(request.POST.get("displaysequence") or subevent.displaysequence)
                 if request.FILES.get("elevationImg"):
                     subevent.elevationImg = request.FILES["elevationImg"]
+                route_gpx = request.FILES.get("routeGpx")
+                if route_gpx:
+                    try:
+                        _apply_route_gpx_to_subevent(subevent, route_gpx)
+                    except ValueError as exc:
+                        messages.error(request, f"Could not process GPX file: {exc}")
+                        return redirect(
+                            f"{reverse('event_details_edit', kwargs={'id': event.id})}?section=categories"
+                        )
                 subevent.save()
                 messages.success(request, "Subevent updated.")
 

@@ -262,6 +262,13 @@ class EventSubDetailTable(models.Model):
     regfeescurrency = models.CharField(max_length=10)
     displaysequence = models.IntegerField(default=0)
     elevationImg = models.ImageField(upload_to='images/subeventsElevationImg/' , blank=True , null=True, storage=PrivateMediaStorage())
+    routeGpx = models.FileField(
+        upload_to='files/subeventRouteGpx/',
+        blank=True,
+        null=True,
+        storage=PrivateMediaStorage(),
+    )
+    routePolyline = models.TextField(blank=True, null=True)
     distancevalue = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     distanceunit = models.CharField(max_length=10, blank=True, null=True)
     minimumage = models.IntegerField(blank=True, null=True)

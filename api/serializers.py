@@ -43,6 +43,7 @@ class EventSubDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'event', 'name', 'eventcategory', 'category_name', 'eventsubdate',
             'regfees', 'regfeescurrency', 'displaysequence', 'elevationImg',
+            'routeGpx', 'routePolyline',
             'distancevalue', 'distanceunit', 'minimumage', 'maximumparticipants', 'isactive',
         ]
 

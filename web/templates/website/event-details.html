@@ -174,7 +174,25 @@
                                     <p><strong>Date:</strong> {{ subevent.eventsubdate }}</p>
                                     <p><strong>Rate:</strong> {{ subevent.regfees }} {{ subevent.regfeescurrency }}</p>
                                     <p><strong>Sequence:</strong> {{ subevent.displaysequence }}</p>
+                                    <p><strong>Route GPX:</strong>
+                                        {% if subevent.routeGpx %}
+                                        <a href="{{ subevent.routeGpx.url }}" target="_blank" rel="noopener">Download GPX</a>
+                                        {% else %}—{% endif %}
+                                    </p>
+                                    <p><strong>Route polyline:</strong>
+                                        {% if subevent.routePolyline %}Generated{% else %}—{% endif %}
+                                    </p>
                                 </div>
+                                <form method="post" enctype="multipart/form-data" class="add-form" style="margin-top:12px;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="upload_subevent_route_gpx">
+                                    <input type="hidden" name="subevent_id" value="{{ subevent.id }}">
+                                    <div class="form-group">
+                                        <label>Route GPX</label>
+                                        <input type="file" name="routeGpx" accept=".gpx,application/gpx+xml,application/xml,text/xml" required>
+                                    </div>
+                                    <button type="submit" class="btn-add">Upload Route GPX</button>
+                                </form>
                             </div>
                             {% endfor %}
                         </div>
