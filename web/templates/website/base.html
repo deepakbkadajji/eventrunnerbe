@@ -13,7 +13,16 @@
     <div class="app-logo">Start 2 Finish</div>
     <div class="app-nav-links">
         <a href="{% url 'home' %}" class="app-nav-link">Home</a>
-        <a href="{% url 'about' %}" class="app-nav-link active">About</a>
+        {% if request.resolver_match.url_name == 'about' %}
+            <span class="app-nav-link active">About</span>
+        {% else %}
+            <a href="{% url 'about' %}" class="app-nav-link">About</a>
+        {% endif %}
+        {% if request.resolver_match.url_name == 'public_policy' or request.resolver_match.url_name == 'public_policy_by_type' or request.resolver_match.url_name == 'public_policy_version' %}
+            <span class="app-nav-link active">Policy</span>
+        {% else %}
+            <a href="{% url 'public_policy' %}" class="app-nav-link">Policy</a>
+        {% endif %}
         <a href="{% url 'login' %}" class="app-nav-link">Login</a>
     </div>
 </nav>

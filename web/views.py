@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+import logging
 from django.utils.dateparse import parse_datetime
 from django.urls import reverse
 from django.contrib.auth import authenticate, login, logout
@@ -48,13 +49,53 @@ from api.views import (
 from api.serializers import EventSubDetailSerializer , EventDetailSerializer
 from api.gpx_utils import gpx_to_encoded_polyline
 
+logger = logging.getLogger(__name__)
+
 # Create your views here.
 
+def _safe_int(value, default, field_name="value"):
+    if value in (None, ""):
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        logger.warning("Invalid integer for %s: %r", field_name, value)
+        return default
+
+
 def _apply_route_gpx_to_subevent(subevent, gpx_file):
-    gpx_file.seek(0)
-    subevent.routePolyline = gpx_to_encoded_polyline(gpx_file.read())
-    gpx_file.seek(0)
-    subevent.routeGpx = gpx_file
+    try:
+        gpx_file.seek(0)
+        subevent.routePolyline = gpx_to_encoded_polyline(gpx_file.read())
+        gpx_file.seek(0)
+        subevent.routeGpx = gpx_file
+    except ValueError:
+        raise
+    except Exception:
+        logger.exception(
+            "Unexpected GPX processing error",
+            extra={"subevent_id": getattr(subevent, "id", None)},
+        )
+        raise ValueError("Could not process GPX file.") from None
+
+
+def _log_subscription_rejection(view_name, action, error_message, **extra):
+    logger.info(
+        "Subscription validation rejected action=%s: %s",
+        action,
+        error_message,
+        extra={"view": view_name, **extra},
+    )
+
+
+def _save_with_upload_error(request, instance, error_message, **log_extra):
+    try:
+        instance.save()
+        return True
+    except Exception:
+        logger.exception("Failed to save record with file upload", extra=log_extra)
+        messages.error(request, error_message)
+        return False
 
 
 def home(request):
@@ -62,6 +103,50 @@ def home(request):
 
 def about(request):
     return render(request, 'website/about.html')
+
+
+@require_http_methods(["GET"])
+def delete_account(request):
+    return render(request, 'website/delete-account.html')
+
+
+def _get_current_policy(document_type='app'):
+    return TermsAndConditionsTable.objects.filter(
+        document_type=document_type,
+        is_current=True,
+    ).first()
+
+
+@require_http_methods(["GET"])
+def public_policy(request, document_type='app'):
+    document_type = (document_type or 'app').strip()[:50]
+    terms = _get_current_policy(document_type)
+    if not terms:
+        logger.info(
+            "Public policy page not found",
+            extra={"document_type": document_type},
+        )
+        return render(
+            request,
+            'website/policy-not-found.html',
+            {'document_type': document_type},
+            status=404,
+        )
+    return render(
+        request,
+        'website/policy.html',
+        {'terms': terms, 'document_type': document_type},
+    )
+
+
+@require_http_methods(["GET"])
+def public_policy_version(request, id):
+    terms = get_object_or_404(TermsAndConditionsTable, id=id)
+    return render(
+        request,
+        'website/policy.html',
+        {'terms': terms, 'document_type': terms.document_type},
+    )
 
 @login_required
 def userhome(request):
@@ -71,7 +156,11 @@ def userhome(request):
 def _optional_int(value):
     if value in (None, ""):
         return None
-    return int(value)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        logger.warning("Invalid optional integer value: %r", value)
+        return None
 
 
 def _administrator_section_for_action(action):
@@ -128,8 +217,15 @@ def administrator(request):
         elif action == "delete_category":
             category = EventCategoryTable.objects.filter(id=request.POST.get("category_id")).first()
             if category:
-                category.delete()
-                messages.success(request, "Event category deleted.")
+                try:
+                    category.delete()
+                    messages.success(request, "Event category deleted.")
+                except ProtectedError:
+                    logger.warning(
+                        "Cannot delete event category with references",
+                        extra={"category_id": request.POST.get("category_id")},
+                    )
+                    messages.error(request, "Cannot delete category while events or subevents reference it.")
             else:
                 messages.error(request, "Category not found.")
 
@@ -187,6 +283,10 @@ def administrator(request):
                     plan.delete()
                     messages.success(request, "Subscription plan deleted.")
                 except Exception:
+                    logger.exception(
+                        "Failed to delete subscription plan",
+                        extra={"plan_id": request.POST.get("plan_id")},
+                    )
                     messages.error(request, "Cannot delete plan while subscriptions reference it.")
 
         elif action == "add_subscription":
@@ -244,8 +344,15 @@ def administrator(request):
                 id=request.POST.get("subscription_id"),
             ).first()
             if subscription:
-                subscription.delete()
-                messages.success(request, "Subscription deleted.")
+                try:
+                    subscription.delete()
+                    messages.success(request, "Subscription deleted.")
+                except ProtectedError:
+                    logger.warning(
+                        "Cannot delete subscription with references",
+                        extra={"subscription_id": request.POST.get("subscription_id")},
+                    )
+                    messages.error(request, "Cannot delete subscription while related records exist.")
             else:
                 messages.error(request, "Subscription not found.")
 
@@ -362,6 +469,10 @@ def administrator(request):
                     terms.delete()
                     messages.success(request, "Terms and conditions deleted.")
                 except ProtectedError:
+                    logger.warning(
+                        "Cannot delete terms and conditions with existing acceptances",
+                        extra={"terms_id": request.POST.get("terms_id")},
+                    )
                     messages.error(
                         request,
                         "Cannot delete this version because participants have already accepted it.",
@@ -528,8 +639,15 @@ def athletic_associations(request):
             association_id = request.POST.get("association_id")
             association = AthleticAssociationTable.objects.filter(id=association_id).first()
             if association:
-                association.delete()
-                messages.success(request, "Athletic association deleted.")
+                try:
+                    association.delete()
+                    messages.success(request, "Athletic association deleted.")
+                except ProtectedError:
+                    logger.warning(
+                        "Cannot delete athletic association with references",
+                        extra={"association_id": association_id},
+                    )
+                    messages.error(request, "Cannot delete association while organisations reference it.")
             else:
                 messages.error(request, "Athletic association not found.")
 
@@ -631,14 +749,22 @@ def athletic_organisations(request):
                     _move_athletic_organisation(organisation, target_parent, position)
                     messages.success(request, "Athletic organisation moved.")
                 except ValueError as exc:
+                    logger.warning("Athletic organisation move rejected: %s", exc)
                     messages.error(request, str(exc))
 
         elif action == "delete":
             organisation_id = request.POST.get("organisation_id")
             organisation = AthleticOrganisationTable.objects.filter(id=organisation_id).first()
             if organisation:
-                organisation.delete()
-                messages.success(request, "Athletic organisation deleted.")
+                try:
+                    organisation.delete()
+                    messages.success(request, "Athletic organisation deleted.")
+                except ProtectedError:
+                    logger.warning(
+                        "Cannot delete athletic organisation with references",
+                        extra={"organisation_id": organisation_id},
+                    )
+                    messages.error(request, "Cannot delete organisation while members or events reference it.")
             else:
                 messages.error(request, "Athletic organisation not found.")
 
@@ -694,8 +820,14 @@ def athletic_organisation_details(request, id):
                     organisation.logo = request.FILES["logo"]
                 if request.FILES.get("banner"):
                     organisation.banner = request.FILES["banner"]
-                organisation.save()
-                messages.success(request, "Athletic organisation updated.")
+                if _save_with_upload_error(
+                    request,
+                    organisation,
+                    "Failed to save organisation. Please check uploaded files and try again.",
+                    organisation_id=organisation.id,
+                    action="update_organisation",
+                ):
+                    messages.success(request, "Athletic organisation updated.")
 
         elif action == "add_member":
             participant_id = request.POST.get("participant")
@@ -831,11 +963,10 @@ def athletic_organisation_details(request, id):
                 title=title,
                 message=message,
                 notificationImg=request.FILES.get("notificationImg"),
-                notification_audience=int(
-                    request.POST.get(
-                        "notification_audience",
-                        OrganisationNotificationAudience.Everyone,
-                    )
+                notification_audience=_safe_int(
+                    request.POST.get("notification_audience"),
+                    OrganisationNotificationAudience.Everyone,
+                    field_name="notification_audience",
                 ),
             )
             messages.success(request, "Notification sent.")
@@ -1067,6 +1198,10 @@ def event_details(request, id):
                     subevent.save()
                     messages.success(request, "Route GPX uploaded and polyline generated.")
                 except ValueError as exc:
+                    logger.warning(
+                        "GPX processing failed for subevent route upload",
+                        extra={"event_id": event.id, "subevent_id": subevent.id},
+                    )
                     messages.error(request, f"Could not process GPX file: {exc}")
             return redirect(f"{reverse('event_details', kwargs={'id': event.id})}?section=categories")
 
@@ -1147,7 +1282,11 @@ def _populate_event_from_post(event, post):
     event.eventname = post.get("eventname", event.eventname or "")
     event.eventdate = post.get("eventdate") or event.eventdate
     event.eventenddate = post.get("eventenddate") or event.eventenddate
-    event.eventstatus = int(post.get("eventstatus", event.eventstatus or EventStatus.Created))
+    event.eventstatus = _safe_int(
+        post.get("eventstatus"),
+        event.eventstatus or EventStatus.Created,
+        field_name="eventstatus",
+    )
     event.eventtype = post.get("eventtype", event.eventtype or "")
     event.eventcategory = post.get("eventcategory", event.eventcategory or "")
     event.eventdescription = post.get("eventdescription", event.eventdescription or "")
@@ -1176,7 +1315,7 @@ def _populate_event_from_post(event, post):
     event.sanctionstatus = post.get("sanctionstatus") or "UNREGISTERED"
     event.sanctionreference = post.get("sanctionreference") or None
     max_participants = post.get("maximumparticipants")
-    event.maximumparticipants = int(max_participants) if max_participants else None
+    event.maximumparticipants = _safe_int(max_participants, None, field_name="maximumparticipants") if max_participants else None
     event.isactive = bool(post.get("isactive"))
     registration_open = post.get("registrationopendate")
     event.registrationopendate = parse_datetime(registration_open) if registration_open else None
@@ -1271,6 +1410,12 @@ def event_create(request):
                     event_status=request.POST.get("eventstatus"),
                 )
                 if subscription_error:
+                    _log_subscription_rejection(
+                        "event_create",
+                        action,
+                        subscription_error,
+                        athleticorganisation_id=request.POST.get("athleticorganisation"),
+                    )
                     messages.error(request, subscription_error)
                 else:
                     event = EventDetailTable(
@@ -1338,6 +1483,13 @@ def event_details_edit(request, id):
                 exclude_event_id=event.id,
             )
             if subscription_error:
+                _log_subscription_rejection(
+                    "event_details_edit",
+                    action,
+                    subscription_error,
+                    event_id=event.id,
+                    athleticorganisation_id=request.POST.get("athleticorganisation"),
+                )
                 messages.error(request, subscription_error)
                 _populate_event_from_post(event, request.POST)
                 return render(
@@ -1353,8 +1505,14 @@ def event_details_edit(request, id):
             event_image, _ = EventImages.objects.get_or_create(event=event)
             if request.FILES.get("eventMainImg"):
                 event_image.eventMainImg = request.FILES["eventMainImg"]
-                event_image.save()
-                messages.success(request, "Event image updated.")
+                if _save_with_upload_error(
+                    request,
+                    event_image,
+                    "Failed to upload event image. Please try again.",
+                    event_id=event.id,
+                    action="update_event_image",
+                ):
+                    messages.success(request, "Event image updated.")
 
         elif action == "add_sponsor":
             EventSponsorTable.objects.create(
@@ -1435,6 +1593,10 @@ def event_details_edit(request, id):
                         _apply_route_gpx_to_subevent(subevent, route_gpx)
                         subevent.save()
                     except ValueError as exc:
+                        logger.warning(
+                            "GPX processing failed when adding subevent",
+                            extra={"event_id": event.id, "subevent_id": subevent.id},
+                        )
                         messages.warning(
                             request,
                             f"Subevent added, but route GPX could not be processed: {exc}",
@@ -1457,6 +1619,10 @@ def event_details_edit(request, id):
                     try:
                         _apply_route_gpx_to_subevent(subevent, route_gpx)
                     except ValueError as exc:
+                        logger.warning(
+                            "GPX processing failed when editing subevent",
+                            extra={"event_id": event.id, "subevent_id": subevent.id},
+                        )
                         messages.error(request, f"Could not process GPX file: {exc}")
                         return redirect(
                             f"{reverse('event_details_edit', kwargs={'id': event.id})}?section=categories"
@@ -1509,27 +1675,24 @@ def event_details_edit(request, id):
 
 @login_required
 def event_details_editpage(request, id):
+    event = get_object_or_404(EventDetailTable, id=id)
 
-
-    event = EventDetailTable.objects.get(
-        id=id
-    )
-
-    subevents = event.subevent_event.all()
-    subeventsSerializer = EventSubDetailSerializer(
-        subevents,
-        many=True
-    )
-
-    eventDetailSerializer = EventDetailSerializer(event , many=False) 
+    try:
+        subevents = event.subevent_event.all()
+        subeventsSerializer = EventSubDetailSerializer(subevents, many=True)
+        eventDetailSerializer = EventDetailSerializer(event, many=False)
+    except Exception:
+        logger.exception("Failed to serialize event for edit page", extra={"event_id": id})
+        messages.error(request, "Could not load event data.")
+        return redirect("events")
 
     return render(
         request,
         "website/event_details_edit_new.html",
         {
             "event": eventDetailSerializer.data,
-            "sub_events": subeventsSerializer.data 
-        }
+            "sub_events": subeventsSerializer.data,
+        },
     )
 
 @login_required
@@ -1557,11 +1720,11 @@ def login_view(request):
         )
 
         if user is not None:
-
             login(request, user)
-
+            logger.info("Web login succeeded", extra={"username": username})
             return redirect("home")
 
+        logger.warning("Web login failed", extra={"username": username})
         return render(
             request,
             "website/login.html",
@@ -1625,7 +1788,7 @@ def _populate_participant_from_post(participant, post, files=None):
     participant.countryofissue = post.get("countryofissue") or None
     participant.typefld = post.get("typefld") or None
     participant.disabled = bool(post.get("disabled"))
-    participant.gender = int(post.get("gender", Gender.notDefined))
+    participant.gender = _safe_int(post.get("gender"), Gender.notDefined, field_name="gender")
     participant.dateOfBirth = post.get("dateOfBirth") or None
     participant.emailaddress = post.get("emailaddress", participant.emailaddress or "")
     participant.usrphonenum = post.get("usrphonenum") or None
@@ -1667,10 +1830,18 @@ def participant_details_edit(request, id):
             messages.error(request, "A participant with this email address already exists.")
         else:
             _populate_participant_from_post(participant, request.POST, request.FILES)
-            participant.save()
-            participant.events.set(request.POST.getlist("events"))
-            messages.success(request, "Participant updated successfully.")
-            return redirect("participant_details", id=participant.id)
+            try:
+                participant.save()
+                participant.events.set(request.POST.getlist("events"))
+            except Exception:
+                logger.exception(
+                    "Failed to update participant",
+                    extra={"participant_id": participant.id},
+                )
+                messages.error(request, "Failed to save participant. Please try again.")
+            else:
+                messages.success(request, "Participant updated successfully.")
+                return redirect("participant_details", id=participant.id)
 
         _populate_participant_from_post(participant, request.POST, request.FILES)
 

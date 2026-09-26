@@ -1,4 +1,7 @@
+import logging
 import xml.etree.ElementTree as ET
+
+logger = logging.getLogger(__name__)
 
 GPX_NS = {"gpx": "http://www.topografix.com/GPX/1/1"}
 
@@ -38,7 +41,11 @@ def extract_track_points_from_gpx(gpx_content):
     if isinstance(gpx_content, bytes):
         gpx_content = gpx_content.decode("utf-8")
 
-    root = ET.fromstring(gpx_content)
+    try:
+        root = ET.fromstring(gpx_content)
+    except ET.ParseError as exc:
+        logger.warning("GPX parse failed: invalid XML")
+        raise ValueError("GPX file is not valid XML.") from exc
     points = []
 
     for trkpt in root.findall(".//gpx:trkpt", GPX_NS):
@@ -65,6 +72,7 @@ def extract_track_points_from_gpx(gpx_content):
                 points.append(point)
 
     if len(points) < 2:
+        logger.warning("GPX parse failed: insufficient track points", extra={"point_count": len(points)})
         raise ValueError("GPX file must contain at least two track or route points.")
 
     return points

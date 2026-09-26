@@ -1,8 +1,11 @@
 from django.db.models import Q
 from django.utils import timezone
+import logging
 
 from api.models import AthleticOrganisationTable, EventDetailTable, SubscriptionTable
 from api.util import EventStatus, SubscriberType, SubscriptionStatus
+
+logger = logging.getLogger(__name__)
 
 ACTIVE_EVENT_STATUSES = (
     EventStatus.Created,
@@ -50,6 +53,10 @@ def validate_club_can_create_event(
 
     club = AthleticOrganisationTable.objects.filter(pk=athletic_org_id).first()
     if club is None:
+        logger.warning(
+            "Club subscription validation failed: organisation not found",
+            extra={"athletic_org_id": athletic_org_id},
+        )
         return "Selected athletic organisation was not found."
 
     today = reference_date or timezone.now().date()
@@ -68,6 +75,10 @@ def validate_club_can_create_event(
     ).select_related('subscriptionplan')
 
     if not valid_subscriptions.exists():
+        logger.info(
+            "Club subscription validation failed: no valid subscription",
+            extra={"athletic_org_id": athletic_org_id},
+        )
         return (
             "This club does not have a valid organisation subscription "
             "(trial or active) covering today's date."
@@ -96,6 +107,15 @@ def validate_club_can_create_event(
     projected_count = active_event_count + 1
     if projected_count >= allowed_events:
         action_label = "save" if exclude_event_id else "create"
+        logger.info(
+            "Club subscription validation failed: active event limit reached",
+            extra={
+                "athletic_org_id": athletic_org_id,
+                "active_event_count": active_event_count,
+                "allowed_events": allowed_events,
+                "projected_count": projected_count,
+            },
+        )
         return (
             f"Cannot {action_label} this event: the club already has {active_event_count} "
             f"other active event(s) and the valid subscription(s) allow fewer than "

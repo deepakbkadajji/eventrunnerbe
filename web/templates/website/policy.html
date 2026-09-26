@@ -1,0 +1,14 @@
+{% extends 'website/base.html' %}
+
+{% block title %}{{ terms.title }}{% endblock %}
+
+{% block content %}
+<h1 class="page-heading">{{ terms.title }}</h1>
+<p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1.25rem;">
+    Version {{ terms.version_number }}
+    {% if terms.effective_from %}
+        · Effective {{ terms.effective_from|date:"F j, Y" }}
+    {% endif %}
+</p>
+<div class="policy-content" style="white-space: pre-wrap; line-height: 1.6;">{{ terms.content }}</div>
+{% endblock %}

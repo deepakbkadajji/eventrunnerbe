@@ -22,6 +22,18 @@ urlpatterns = [
         name='athletic_organisation_details'
     ),
     path('about/', views.about, name='about'),
+    path('delete-account/', views.delete_account, name='delete_account'),
+    path('policy/', views.public_policy, {'document_type': 'app'}, name='public_policy'),
+    path(
+        'policy/version/<int:id>/',
+        views.public_policy_version,
+        name='public_policy_version',
+    ),
+    path(
+        'policy/<str:document_type>/',
+        views.public_policy,
+        name='public_policy_by_type',
+    ),
     path('events/', views.events, name='events'),
     path('organisations/', views.organisations, name='organisations'),
     path(

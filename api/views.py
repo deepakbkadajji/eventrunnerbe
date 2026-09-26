@@ -89,6 +89,8 @@ from eventrunnerbe.notifications.utils import send_push_notification
 
 from openpyxl import load_workbook
 
+from api.storage_utils import generate_s3_presigned_url
+
 #from eventrunnerbe.utils import customTokenBackend
 
 #from eventrunnerbe.utils import CustomJWTAuthentication
@@ -104,6 +106,9 @@ from functools import wraps
 import jwt
 
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_request_body(request):
@@ -111,8 +116,103 @@ def _parse_request_body(request):
         if request.body:
             return json.loads(request.body.decode('utf-8'))
     except (json.JSONDecodeError, UnicodeDecodeError, AttributeError):
-        pass
+        logger.debug("Could not parse request body as JSON", extra={"path": request.path})
     return request.data if isinstance(request.data, dict) else {}
+
+
+def _parse_body_or_400(request):
+    if request.body:
+        try:
+            decoded = request.body.decode('utf-8')
+            if decoded.strip():
+                parsed = json.loads(decoded)
+                if isinstance(parsed, dict):
+                    return parsed, None
+                logger.warning(
+                    "JSON body is not an object",
+                    extra={"path": request.path},
+                )
+                return None, Response(
+                    {'detail': 'JSON body must be an object.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            logger.warning("Invalid JSON body", extra={"path": request.path})
+            return None, Response(
+                {'detail': 'Invalid JSON.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    if isinstance(request.data, dict):
+        return request.data, None
+    return {}, None
+
+
+def _queryset_by_event_or_id(queryset, body, event_field='event', id_field='id', ordering=None):
+    if ordering is not None:
+        queryset = queryset.order_by(ordering)
+    if event_field:
+        event_id = body.get(event_field)
+        if event_id is not None and event_id != '':
+            return queryset.filter(**{event_field: event_id}), True
+    record_id = body.get(id_field)
+    if record_id is not None and record_id != '':
+        return queryset.filter(**{id_field: record_id}), False
+    return queryset, True
+
+
+def _filtered_viewset_response(
+    request,
+    queryset,
+    serializer_class,
+    event_field='event',
+    id_field='id',
+    ordering=None,
+):
+    body, error_response = _parse_body_or_400(request)
+    if error_response:
+        return error_response
+    records, many = _queryset_by_event_or_id(
+        queryset,
+        body,
+        event_field=event_field,
+        id_field=id_field,
+        ordering=ordering,
+    )
+    serializer = serializer_class(records, many=many)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+def _get_participant_queryset_or_404(queryset, **lookup):
+    try:
+        return queryset.get(**lookup), None
+    except ParticipantTable.DoesNotExist:
+        logger.debug("Participant not found", extra=lookup)
+        return None, Response(
+            {'detail': 'Participant not found.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+
+def _get_event_or_404(event_id):
+    try:
+        return EventDetailTable.objects.get(id=event_id), None
+    except EventDetailTable.DoesNotExist:
+        logger.warning("Event not found", extra={"event_id": event_id})
+        return None, Response(
+            {'detail': 'Event not found.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+
+def _get_participant_or_404(participant_id):
+    try:
+        return ParticipantTable.objects.get(id=participant_id), None
+    except ParticipantTable.DoesNotExist:
+        logger.warning("Participant not found", extra={"participant_id": participant_id})
+        return None, Response(
+            {'detail': 'Participant not found.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
 
 
 def _filter_queryset(queryset, body, filters):
@@ -133,6 +233,7 @@ def _get_participant_from_body(request):
     try:
         return ParticipantTable.objects.get(id=participant_id), None
     except ParticipantTable.DoesNotExist:
+        logger.debug("Participant not found from request body", extra={"participant_id": participant_id})
         return None, Response(
             {'detail': 'Participant not found.'},
             status=status.HTTP_404_NOT_FOUND,
@@ -280,84 +381,88 @@ import requests
 
 from django.http import JsonResponse
 
-import boto3
-from django.conf import settings
-
-
-
-def generate_s3_presigned_url(object_key, expiration=600):
-    """
-    Generates a presigned URL for an S3 object.
-
-    Args:
-        object_key (str): The key (path) of the object in the S3 bucket.
-        expiration (int): The duration in seconds for which the presigned URL is valid.
-                          Defaults to 3600 seconds (1 hour).
-
-    Returns:
-        str: The presigned URL, or None if an error occurs.
-    """
-    s3_client = boto3.client(
-        's3',
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        region_name=settings.AWS_S3_REGION_NAME # Ensure this is defined in your settings.py
-    )
-    try:
-        response = s3_client.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': settings.AWS_STORAGE_BUCKET_NAME, 'Key': object_key},
-            ExpiresIn=expiration
-        )
-        return response
-    except Exception as e:
-        print(f"Error generating presigned URL: {e}")
-        return None
 
 def get_token_auth_header(request):
-    """Obtains the Access Token from the Authorization Header
-    """
-    auth = request.META.get("HTTP_AUTHORIZATION", None)
-    #print(auth)
-    parts = auth.split()
-    token = parts[1]
+    """Obtains the Access Token from the Authorization Header"""
+    auth = request.META.get("HTTP_AUTHORIZATION")
+    if not auth:
+        logger.warning("Missing Authorization header")
+        raise ValueError("Authorization header is missing.")
 
-    return token
+    parts = auth.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        logger.warning("Malformed Authorization header")
+        raise ValueError("Authorization header must be Bearer token.")
+
+    return parts[1]
+
 
 def jwt_decode_token(token):
-    header = jwt.get_unverified_header(token)
-    jwks = requests.get('https://{}/.well-known/jwks.json'.format('dev-x8hbr3jrn2mxvw4x.us.auth0.com')).json()
+    try:
+        header = jwt.get_unverified_header(token)
+    except jwt.PyJWTError:
+        logger.warning("Invalid JWT token header")
+        raise ValueError("Invalid token.") from None
+
+    auth0_domain = 'dev-x8hbr3jrn2mxvw4x.us.auth0.com'
+    try:
+        jwks_response = requests.get(
+            f'https://{auth0_domain}/.well-known/jwks.json',
+            timeout=10,
+        )
+        jwks_response.raise_for_status()
+        jwks = jwks_response.json()
+    except requests.RequestException:
+        logger.exception("Failed to fetch Auth0 JWKS")
+        raise ValueError("Unable to validate token.") from None
+
     public_key = None
-    for jwk in jwks['keys']:
-        if jwk['kid'] == header['kid']:
+    for jwk in jwks.get('keys', []):
+        if jwk.get('kid') == header.get('kid'):
             public_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk))
+            break
 
     if public_key is None:
-        raise Exception('Public key not found.')
+        logger.error("Auth0 public key not found", extra={"kid": header.get('kid')})
+        raise ValueError('Public key not found.')
 
-    issuer = 'https://{}/'.format('dev-x8hbr3jrn2mxvw4x.us.auth0.com')
-    return jwt.decode(token, public_key, audience='https://eventrunner.com/api/', issuer=issuer, algorithms=['RS256'])
+    issuer = f'https://{auth0_domain}/'
+    try:
+        return jwt.decode(
+            token,
+            public_key,
+            audience='https://eventrunner.com/api/',
+            issuer=issuer,
+            algorithms=['RS256'],
+        )
+    except jwt.PyJWTError:
+        logger.warning("JWT decode failed")
+        raise ValueError("Invalid token.") from None
+
 
 def requires_scope(required_scope):
-    """Determines if the required scope is present in the Access Token
-    Args:
-        required_scope (str): The scope required to access the resource
-    """
+    """Determines if the required scope is present in the Access Token"""
     def require_scope(f):
         @wraps(f)
         def decorated(*args, **kwargs):
-            token = get_token_auth_header(args[0])
-            #print(token)   
-            
-            decoded = jwt_decode_token(token)  
-            #print(decoded)  
+            try:
+                token = get_token_auth_header(args[0])
+                decoded = jwt_decode_token(token)
+            except ValueError as exc:
+                response = JsonResponse({'message': str(exc)})
+                response.status_code = status.HTTP_401_UNAUTHORIZED
+                return response
 
-            #decoded = jwt.decode(token, verify=False , algorithms=['RS256'])
             if decoded.get("scope"):
                 token_scopes = decoded["scope"].split()
                 for token_scope in token_scopes:
                     if token_scope == required_scope:
                         return f(*args, **kwargs)
+
+            logger.warning(
+                "Insufficient token scope",
+                extra={"required_scope": required_scope},
+            )
             response = JsonResponse({'message': 'You don\'t have access to this resource'})
             response.status_code = 403
             return response
@@ -455,75 +560,100 @@ def getParticipantCompletedPastEventCards(request):
 @api_view(['GET'])
 #@requires_scope('read:events')
 def getEvent(request , pk):
-    eventdetail = EventDetailTable.objects.get(id = pk)
+    eventdetail, error_response = _get_event_or_404(pk)
+    if error_response:
+        return error_response
     eventserializer = EventDetailSerializer(eventdetail , many=False)
-    return  Response(eventserializer.data)
+    return Response(eventserializer.data)
 
 @api_view(['GET'])
 #@requires_scope('read:events')
 def getEventRelated(request , pk):
-    eventdetail = EventDetailTable.objects.get(id = pk)
-    #eventImages = EventDetailTable.objects.select_related('event')
-    #if eventImages.count() == 0:
-    #    print('querysetempty')
+    _, error_response = _get_event_or_404(pk)
+    if error_response:
+        return error_response
 
-    eventImg =  EventImages.objects.select_related('event').all()
-
-    #if eventdetail2.count() != 0:
-    #    return  Response('Event images')
-    #else:
-    #    return  Response('No event images')
+    eventImg = EventImages.objects.select_related('event').all()
     eventImgserializer = EventImageSerializer(eventImg , many=True)
-    #eventserializer = EventDetailSerializer(eventdetail2 , many=True)
-    
-    return  Response(eventImgserializer.data)
+    return Response(eventImgserializer.data)
 
 @api_view(['POST'])
 #@requires_scope('create:event')
 def createEvent(request):
     data = request.data
-    eventdetail = EventDetailTable.objects.create(
-        eventid = data['eventid'],
-        eventname = data['eventname'],
-        contactpersonname = data['contactpersonname'],
-        contactpersonsurname = data['contactpersonsurname'],
-        eventstatus = data['eventstatus'],
-        eventdescription = data['eventdescription'],
-        eventtype = data['eventtype'],
-        eventcategory = data['eventcategory']
-    )
+    try:
+        eventdetail = EventDetailTable.objects.create(
+            eventid=data['eventid'],
+            eventname=data['eventname'],
+            contactpersonname=data['contactpersonname'],
+            contactpersonsurname=data['contactpersonsurname'],
+            eventstatus=data['eventstatus'],
+            eventdescription=data['eventdescription'],
+            eventtype=data['eventtype'],
+            eventcategory=data['eventcategory'],
+        )
+    except KeyError as exc:
+        logger.warning("createEvent missing required field", extra={"field": str(exc)})
+        return Response(
+            {'detail': f'Missing required field: {exc}'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    except Exception:
+        logger.exception("createEvent failed")
+        return Response(
+            {'detail': 'Could not create event.'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    logger.info("Event created", extra={"event_id": eventdetail.id})
     eventserializer = EventDetailSerializer(eventdetail , many=False)
-    return  Response(eventserializer.data)
+    return Response(eventserializer.data)
 
 @api_view(['PUT'])
 #@requires_scope('update:event')
 def updateEvent(request , pk):
-    data = request.data
-    eventdetail = EventDetailTable.objects.get(id = pk)
+    eventdetail, error_response = _get_event_or_404(pk)
+    if error_response:
+        return error_response
+
     eventserializer = EventDetailSerializer(eventdetail , data=request.data)
     if eventserializer.is_valid():
-        eventserializer.save()    
-    return  Response(eventserializer.data)
+        eventserializer.save()
+        logger.info("Event updated", extra={"event_id": pk})
+    else:
+        logger.warning(
+            "updateEvent validation failed",
+            extra={"event_id": pk, "errors": eventserializer.errors},
+        )
+    return Response(eventserializer.data)
 
 @api_view(['DELETE'])
 #@requires_scope('delete:event')
 def deleteEvent(request , pk):
-    eventdetail = EventDetailTable.objects.get(id = pk)
-    eventdetail.delete()  
-    return  Response("Event was deleted")
+    eventdetail, error_response = _get_event_or_404(pk)
+    if error_response:
+        return error_response
+
+    eventdetail.delete()
+    logger.info("Event deleted", extra={"event_id": pk})
+    return Response("Event was deleted")
 
 @api_view(['GET'])
 #@requires_scope('read:events')
 def getEventsUnregistered(request , pk):
-    participantdetail = ParticipantTable.objects.get(id = pk)
-    #eventparticipantsdetail = participantdetail.events.all().values('id')
-    eventlist = ParticipantEventTable.objects.filter(participant=participantdetail).filter(paymref__payment_status='Completed').values('event')
-    eventdetail = EventDetailTable.objects.exclude(id__in=eventlist).exclude(Q(eventstatus=EventStatus.Completed) | Q(eventstatus=EventStatus.Closed)).order_by('eventdate')
+    participantdetail, error_response = _get_participant_or_404(pk)
+    if error_response:
+        return error_response
 
-    
-
+    eventlist = ParticipantEventTable.objects.filter(
+        participant=participantdetail,
+        paymref__payment_status='Completed',
+    ).values('event')
+    eventdetail = EventDetailTable.objects.exclude(id__in=eventlist).exclude(
+        Q(eventstatus=EventStatus.Completed) | Q(eventstatus=EventStatus.Closed),
+    ).order_by('eventdate')
     eventserializer = EventDetailSerializer(eventdetail , many=True)
-    return  Response(eventserializer.data)
+    return Response(eventserializer.data)
 
 ##### Participants
 @api_view(['GET'])
@@ -536,26 +666,29 @@ def getParticipants(request):
 @api_view(['GET'])
 #@requires_scope('read:profile')
 def getParticipant(request , pk):
-    participantdetail = ParticipantTable.objects.get(id = pk)
+    participantdetail, error_response = _get_participant_or_404(pk)
+    if error_response:
+        return error_response
     participantserializer = ParticipantSerializer(participantdetail , many=False)
-    return  Response(participantserializer.data)
+    return Response(participantserializer.data)
 
 @api_view(['GET'])
 #@requires_scope('read:profile')
 def getParticipantExists(request , pk):
-    participantdetail = ParticipantTable.objects.get(id = pk)
+    participantdetail, error_response = _get_participant_or_404(pk)
+    if error_response:
+        return error_response
     participantserializer = ParticipantSerializer(participantdetail , many=False)
 
-    if (participantdetail.authid):
-        return Response("Participant exists" , HttpStatus=status.HTTP_200_OK)
-    else:
-        return Response("Participant does not exist" , status=status.HTTP_204_NO_CONTENT)   
+    if participantdetail.authid:
+        return Response("Participant exists" , status=status.HTTP_200_OK)
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 @api_view(['POST'])
 #@requires_scope('create:profile')
 def createParticipant(request):
     data = request.data
-    print(data)
+    logger.debug("createParticipant request received", extra={"field_count": len(data)})
     participantdetail = ParticipantTable.objects.create(
         user = data['user'],
         title = data['title'],
@@ -577,25 +710,39 @@ def createParticipant(request):
 @api_view(['PUT'])
 #@requires_scope('update:profile')
 def updateParticipant(request , pk):
-    data = request.data
-    participantdetail = ParticipantTable.objects.get(id = pk)
+    participantdetail, error_response = _get_participant_or_404(pk)
+    if error_response:
+        return error_response
+
     participantserializer = ParticipantSerializer(participantdetail , data=request.data)
     if participantserializer.is_valid():
-        participantserializer.save()    
-    return  Response(participantserializer.data)
+        participantserializer.save()
+        logger.info("Participant updated", extra={"participant_id": pk})
+    else:
+        logger.warning(
+            "updateParticipant validation failed",
+            extra={"participant_id": pk, "errors": participantserializer.errors},
+        )
+    return Response(participantserializer.data)
 
 @api_view(['DELETE'])
 #@requires_scope('delete:profile')
 def deleteParticipant(request , pk):
-    participantdetail = ParticipantTable.objects.get(id = pk)
-    participantdetail.delete()  
-    return  Response("Participant was deleted")
+    participantdetail, error_response = _get_participant_or_404(pk)
+    if error_response:
+        return error_response
+
+    participantdetail.delete()
+    logger.info("Participant deleted", extra={"participant_id": pk})
+    return Response("Participant was deleted")
 
 ##### Participants  events
 @api_view(['GET'])
 #@requires_scope('read:events')
 def getParticipantEvents(request, pk):
-    participantdetail = ParticipantTable.objects.get(id = pk)
+    participantdetail, error_response = _get_participant_or_404(pk)
+    if error_response:
+        return error_response
 
     participant_events = ParticipantEventTable.objects.filter(
         participant=participantdetail,
@@ -641,19 +788,24 @@ def getParticipantEvents(request, pk):
 @api_view(['GET'])
 #@requires_scope('read:events')
 def getEventsParticipant(request, pk):
-    eventDetTable = EventDetailTable.objects.get(id = pk)
+    eventDetTable, error_response = _get_event_or_404(pk)
+    if error_response:
+        return error_response
     
-    participantslist = ParticipantEventTable.objects.filter(event=eventDetTable).filter(paymref__payment_status='Completed').values('participant')
-
+    participantslist = ParticipantEventTable.objects.filter(
+        event=eventDetTable,
+        paymref__payment_status='Completed',
+    ).values('participant')
     particpantsDetails = ParticipantTable.objects.filter(id__in=participantslist)
     particpantsserializer = ParticipantSerializer(particpantsDetails , many=True)
-
     return Response(particpantsserializer.data)
 
 @api_view(['GET'])
 #@requires_scope('read:events')
 def getParticipantCompletedEvents(request, pk):
-    participantdetail = ParticipantTable.objects.get(id = pk)
+    participantdetail, error_response = _get_participant_or_404(pk)
+    if error_response:
+        return error_response
     #eventdetails = participantdetail.events.filter(eventstatus__in=[EventStatus.Closed, EventStatus.Completed])   
     #eventserializer = EventDetailSerializer(eventdetails , many=True)
 
@@ -668,21 +820,55 @@ def getParticipantCompletedEvents(request, pk):
 #@requires_scope('update:participant')
 def updateParticipantEvent(request):
     data = request.data
-    
-    participantdetail = ParticipantTable.objects.get(id = data['user'])
-    eventdetail = EventDetailTable.objects.get(id = data['event'])
-    participantdetail.events.add(eventdetail)  
-    return  Response("Participant was enrolled to the event")
+    participant_id = data.get('user')
+    event_id = data.get('event')
+    if not participant_id or not event_id:
+        return Response(
+            {'detail': 'user and event are required.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    participantdetail, error_response = _get_participant_or_404(participant_id)
+    if error_response:
+        return error_response
+
+    eventdetail, error_response = _get_event_or_404(event_id)
+    if error_response:
+        return error_response
+
+    participantdetail.events.add(eventdetail)
+    logger.info(
+        "Participant enrolled in event",
+        extra={"participant_id": participant_id, "event_id": event_id},
+    )
+    return Response("Participant was enrolled to the event")
 
 @api_view(['POST'])
 #@requires_scope('update:event')
 def removeParticipantEvent(request):
     data = request.data
-    
-    participantdetail = ParticipantTable.objects.get(id = data['user'])
-    eventdetail = EventDetailTable.objects.get(id = data['event'])
-    participantdetail.events.remove(eventdetail)  
-    return  Response("Participant was disenrolled to the event")
+    participant_id = data.get('user')
+    event_id = data.get('event')
+    if not participant_id or not event_id:
+        return Response(
+            {'detail': 'user and event are required.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    participantdetail, error_response = _get_participant_or_404(participant_id)
+    if error_response:
+        return error_response
+
+    eventdetail, error_response = _get_event_or_404(event_id)
+    if error_response:
+        return error_response
+
+    participantdetail.events.remove(eventdetail)
+    logger.info(
+        "Participant removed from event",
+        extra={"participant_id": participant_id, "event_id": event_id},
+    )
+    return Response("Participant was disenrolled to the event")
 
 ##### Events images
 @api_view(['GET'])
@@ -694,9 +880,6 @@ def getEventImage(request , pk):
     else:
         respResult = "Count is zero"
 
-    for obj in eventimages:
-        print(obj)  # Access attributes of the model instance
-
     eventimgserializer = EventImageSerializer(eventimages , many=True)
     #return  Response(eventimgserializer.data)
     return  Response(eventimgserializer.data)
@@ -704,27 +887,19 @@ def getEventImage(request , pk):
 ##### Events images
 @api_view(['GET'])
 def getEventImageUsable(request , pk):
-    #eventDet = EventDetailTable.objects.get(id = pk)
     eventimages = EventImages.objects.filter(event=pk)
-    if eventimages.count():
-        respResult = "Count is not zero"
-    else:
-        respResult = "Count is zero"
+    data = []
 
     for obj in eventimages:
-        print(obj)  # Access attributes of the model instance
-        
         presigned_url = generate_s3_presigned_url('media/public/' + obj.eventMainImg.name)
 
-        data = [
-            {            
-                'id': obj.id,
-                'event': obj.event.id,
-                'eventMainImg': presigned_url if presigned_url else None
-            }
-        ]
+        data.append({
+            'id': obj.id,
+            'event': obj.event.id,
+            'eventMainImg': presigned_url if presigned_url else None,
+        })
 
-    return  Response(data , status=status.HTTP_200_OK)
+    return Response(data, status=status.HTTP_200_OK)
 
             
 class eventImageViewSet(ModelViewSet):
@@ -733,25 +908,39 @@ class eventImageViewSet(ModelViewSet):
     parser_classes = (MultiPartParser , FormParser)
 
     def create(self , request  , *args, **kwargs):
-        event = request.data['event']
-        eventDetTable = EventDetailTable.objects.get(id = event)
+        event = request.data.get('event')
+        if not event:
+            return Response({'detail': 'event is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        eventMainImg = request.data['eventMainImg']
+        eventDetTable, error_response = _get_event_or_404(event)
+        if error_response:
+            return error_response
+
+        eventMainImg = request.data.get('eventMainImg')
+        if not eventMainImg:
+            return Response({'detail': 'eventMainImg is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
         eventImg = EventImages.objects.filter(event=event)
-        if (eventImg.count() != 0):
+        if eventImg.count() != 0:
             eventImg.delete()
 
-        EventImages.objects.create(event = eventDetTable , eventMainImg = eventMainImg)            
+        EventImages.objects.create(event=eventDetTable, eventMainImg=eventMainImg)
+        logger.info("Event image uploaded", extra={"event_id": event})
 
-        return Response("Event image uploaded successfully" , status = 201)    
+        return Response("Event image uploaded successfully", status=status.HTTP_201_CREATED)
     
     def retrieve(self , request  , *args, **kwargs):
-        event = request.data['event']
-        eventDetTable = EventDetailTable.objects.get(id = event)        
+        event = request.data.get('event')
+        if not event:
+            return Response({'detail': 'event is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        _, error_response = _get_event_or_404(event)
+        if error_response:
+            return error_response
+
         eventImg = EventImages.objects.filter(event=event)
-   
         eventimgserializer = EventImageSerializer(eventImg , many=True)
-        return Response(eventimgserializer.data)    
+        return Response(eventimgserializer.data)
 
     
 class participantCheckViewSet(ModelViewSet):
@@ -760,26 +949,37 @@ class participantCheckViewSet(ModelViewSet):
     parser_classes = (MultiPartParser , FormParser , JSONParser)
 
     def retrieve(self , request  , *args, **kwargs):
-        participantAuthid = request.data['authid']
-        reqType = request.data['requesttype']  
-        
-        participant = ParticipantTable.objects.get(authid = participantAuthid) 
-        if  reqType == 'check':
-            if (participant.authid):
-                return Response("Participant exists" , HttpStatus=status.HTTP_200_OK)
-            else:
-                return Response("Participant does not exist" , status=status.HTTP_204_NO_CONTENT)   
-        else:
-            participantserializer = ParticipantSerializer(participant , many=False)
-            return  Response(participantserializer.data, HttpStatus=status.HTTP_200_OK)
+        participantAuthid = request.data.get('authid')
+        reqType = request.data.get('requesttype')
+
+        if not participantAuthid:
+            return Response({'detail': 'authid is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            participant = ParticipantTable.objects.get(authid=participantAuthid)
+        except ParticipantTable.DoesNotExist:
+            logger.debug("Participant check not found", extra={"authid": participantAuthid})
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        if reqType == 'check':
+            if participant.authid:
+                return Response("Participant exists", status=status.HTTP_200_OK)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        participantserializer = ParticipantSerializer(participant , many=False)
+        return Response(participantserializer.data, status=status.HTTP_200_OK)
         
     def list(self , request  , *args, **kwargs):
-        participantAuthid = request.data['authid']
-        reqType = request.data['requesttype']  
+        participantAuthid = request.data.get('authid')
+        reqType = request.data.get('requesttype')
+
+        if not participantAuthid:
+            return Response({'detail': 'authid is required.'}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
             participant = ParticipantTable.objects.get(authid = participantAuthid)
         except ParticipantTable.DoesNotExist:
+            logger.debug("Participant check not found", extra={"authid": participantAuthid})
             return Response("")
 
         if  reqType == 'check':
@@ -799,21 +999,26 @@ class participantViewSet(ModelViewSet):
         return ParticipantSerializer
 
     def retrieve(self , request  , *args, **kwargs):
-        participantEmailAddr = request.data['emailaddress']
-        participantAuthid = request.data['authid']
-        reqType = request.data['reqtype']  
-        
-        participant = _participant_detail_queryset().get(emailaddress = participantEmailAddr)
-        #participant = ParticipantTable.objects.get(authid = participantAuthid)
-        if  reqType == 'check':
-            if (participant.emailaddress):
-            #if (participant.authid):
-                return Response("Participant exists" , status=status.HTTP_200_OK)
-            else:
-                return Response("Participant does not exist" , status=status.HTTP_204_NO_CONTENT)   
-        else:
-            participantserializer = ParticipantDetailSerializer(participant , many=False)
-            return  Response(participantserializer.data, status=status.HTTP_200_OK)
+        participantEmailAddr = request.data.get('emailaddress')
+        reqType = request.data.get('reqtype')
+
+        if not participantEmailAddr:
+            return Response({'detail': 'emailaddress is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        participant, error_response = _get_participant_queryset_or_404(
+            _participant_detail_queryset(),
+            emailaddress=participantEmailAddr,
+        )
+        if error_response:
+            if reqType == 'check':
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            return error_response
+
+        if reqType == 'check':
+            return Response("Participant exists", status=status.HTTP_200_OK)
+
+        participantserializer = ParticipantDetailSerializer(participant , many=False)
+        return Response(participantserializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'], url_path='lookup-by-email')
     def lookup_by_email(self, request):
@@ -828,6 +1033,7 @@ class participantViewSet(ModelViewSet):
         try:
             participant = _participant_detail_queryset().get(emailaddress=participant_email)
         except ParticipantTable.DoesNotExist:
+            logger.debug("Participant lookup by email not found")
             return Response(status=status.HTTP_204_NO_CONTENT)
 
         return Response(
@@ -854,6 +1060,7 @@ class participantViewSet(ModelViewSet):
             usrname = request.data["user"]
             usr = User.objects.get(username= usrname)             
         except User.DoesNotExist:
+            logger.warning("Participant create failed: invalid user")
             return Response("Invalid user", status=status.HTTP_409_CONFLICT)
         
         if (request.data['emailaddress'] == None or request.data['emailaddress'] == ''):
@@ -879,146 +1086,127 @@ class participantViewSet(ModelViewSet):
 
         reqData = request.data
 
-        print(reqData)
+        logger.debug(
+            "participantViewSet.create completed",
+            extra={"participant_id": participantTable.id},
+        )
 
         participantserializer = ParticipantSerializer(participantTable , many=False)
         return  Response(participantserializer.data , status=status.HTTP_201_CREATED)
     
     def update(self , request  , *args, **kwargs):
-        participantId = request.data['id']
-        participantTable = ParticipantTable.objects.prefetch_related(
-            Prefetch(
-                'athleticorganisationmember_participant',
-                queryset=AthleticOrganisationMemberTable.objects.filter(
-                    status=OrganisationMemberStatus.Active,
-                ).select_related('athleticorganisation'),
-            ),
-        ).get(id = participantId)        
+        participantId = request.data.get('id')
+        if not participantId:
+            return Response({'detail': 'id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            participantTable = ParticipantTable.objects.prefetch_related(
+                Prefetch(
+                    'athleticorganisationmember_participant',
+                    queryset=AthleticOrganisationMemberTable.objects.filter(
+                        status=OrganisationMemberStatus.Active,
+                    ).select_related('athleticorganisation'),
+                ),
+            ).get(id=participantId)
+        except ParticipantTable.DoesNotExist:
+            logger.warning("Participant update failed: not found", extra={"participant_id": participantId})
+            return Response({'detail': 'Participant not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         reqData = request.data
 
-        print(reqData)
+        logger.debug(
+            "participantViewSet.update",
+            extra={"participant_id": participantId, "field_count": len(reqData)},
+        )
 
-        for reqAttr in request.data:
-            if reqAttr == 'title':
-                participantTable.title = request.data[reqAttr] 
-            elif reqAttr == 'surname':
-                participantTable.surname = request.data[reqAttr]
-            elif reqAttr == 'firstname':
-                participantTable.firstname = request.data[reqAttr]
-            elif reqAttr == 'initials':
-                participantTable.initials = request.data[reqAttr] 
-            elif reqAttr == 'preferredname':
-                participantTable.preferredname = request.data[reqAttr]
-            elif reqAttr == 'homelanguage':
-                participantTable.homelanguage = request.data[reqAttr]
-            elif reqAttr == 'preferredlanguage':
-                participantTable.preferredlanguage = request.data[reqAttr]
-            elif reqAttr == 'maidenname':
-                participantTable.maidenname = request.data[reqAttr]
-            elif reqAttr == 'countryofissue':
-                participantTable.countryofissue = request.data[reqAttr] 
-            #elif reqAttr == 'emailaddress':
-            #    participantTable.emailaddress = request.data[reqAttr]
-            elif reqAttr == 'usrphonenum':
-                participantTable.usrphonenum = request.data[reqAttr]
-            elif reqAttr == 'dateOfBirth':
-                datetime_object = dateparse.parse_datetime(request.data[reqAttr]) 
-                participantTable.dateOfBirth = datetime_object.date()
-            elif reqAttr == 'gender':
-                try:
-                    genderIntValue = int(request.data[reqAttr])                    
-                except (ValueError, TypeError):
-                    # Handle cases where the string cannot be converted to an integer
-                    raise ValueError("Invalid value for gender field. Must be an integer.")  
-                participantTable.gender = genderIntValue
-            elif reqAttr == 'profilepic':
-                participantTable.profilepic = request.data[reqAttr]
-            elif reqAttr == 'event':
-
-                event = request.data[reqAttr]
-                try:
-                    eventDetTable = EventDetailTable.objects.get(id = event)  
-                    participantTable.events.add(eventDetTable)
-                    
-                except EventDetailTable.DoesNotExist:
-                    return Response("Event does not exists", status=status.HTTP_400_BAD_REQUEST)              
-            elif reqAttr == 'user':
-                try:
-                    usrname = request.data[reqAttr]
-                    usr = User.objects.filter(username= request.data[reqAttr]) 
-                    if usr.count() == 0 :
+        try:
+            for reqAttr in request.data:
+                if reqAttr == 'title':
+                    participantTable.title = request.data[reqAttr]
+                elif reqAttr == 'surname':
+                    participantTable.surname = request.data[reqAttr]
+                elif reqAttr == 'firstname':
+                    participantTable.firstname = request.data[reqAttr]
+                elif reqAttr == 'initials':
+                    participantTable.initials = request.data[reqAttr]
+                elif reqAttr == 'preferredname':
+                    participantTable.preferredname = request.data[reqAttr]
+                elif reqAttr == 'homelanguage':
+                    participantTable.homelanguage = request.data[reqAttr]
+                elif reqAttr == 'preferredlanguage':
+                    participantTable.preferredlanguage = request.data[reqAttr]
+                elif reqAttr == 'maidenname':
+                    participantTable.maidenname = request.data[reqAttr]
+                elif reqAttr == 'countryofissue':
+                    participantTable.countryofissue = request.data[reqAttr]
+                elif reqAttr == 'usrphonenum':
+                    participantTable.usrphonenum = request.data[reqAttr]
+                elif reqAttr == 'dateOfBirth':
+                    datetime_object = dateparse.parse_datetime(request.data[reqAttr])
+                    participantTable.dateOfBirth = datetime_object.date()
+                elif reqAttr == 'gender':
+                    try:
+                        genderIntValue = int(request.data[reqAttr])
+                    except (ValueError, TypeError) as exc:
+                        raise ValueError("Invalid value for gender field. Must be an integer.") from exc
+                    participantTable.gender = genderIntValue
+                elif reqAttr == 'profilepic':
+                    participantTable.profilepic = request.data[reqAttr]
+                elif reqAttr == 'event':
+                    event = request.data[reqAttr]
+                    try:
+                        eventDetTable = EventDetailTable.objects.get(id=event)
+                        participantTable.events.add(eventDetTable)
+                    except EventDetailTable.DoesNotExist:
+                        return Response("Event does not exists", status=status.HTTP_400_BAD_REQUEST)
+                elif reqAttr == 'user':
+                    usr = User.objects.filter(username=request.data[reqAttr])
+                    if usr.count() == 0:
                         return Response("User does not exists", status=status.HTTP_400_BAD_REQUEST)
-                    participantTable.user = usr
-                except ParticipantTable.DoesNotExist:
-                    return Response("Something went wrong when retrieving user", status=status.HTTP_409_CONFLICT)
-                
-        
-        print(reqData)
-        #participantTable.typefld = request.data['typefld']
-        #participantTable.disabled = request.data['disabled']
-        #participantTable.gender = request.data['gender']
+                    participantTable.user = usr.first()
+        except ValueError as exc:
+            logger.warning(
+                "Participant update validation failed",
+                extra={"participant_id": participantId, "error": str(exc)},
+            )
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        #if (hasattr(request.data , 'usrphonenum')) :
-        #    participantTable.usrphonenum = request.data['usrphonenum']
-        #if (hasattr(request.data , 'profilepic')):
-        #    participantTable.profilepic = request.data['profilepic']
-        #usr = User.objects.get(id= request.data['user']) ; 
-        #participantTable.user = usr
-        #   
+        logger.debug(
+            "participantViewSet.update saving",
+            extra={"participant_id": participantId},
+        )
 
-        participantTable.save() 
-
-        #participantserializer = ParticipantSerializer(participantTable , data=request.data)
-        #if participantserializer.is_valid():
-        #    participantserializer.save()
-
-        #    return Response("Is valid")       
-        #else:
-        #    return Response("Is not valid")  
-        
+        participantTable.save()
         participantserializer = ParticipantDetailSerializer(participantTable , many=False)
         return Response(participantserializer.data , status=status.HTTP_200_OK)   
    
     def partial_update(self , request  , *args, **kwargs):
-        participantId = request.data['id']
-        participantTable = ParticipantTable.objects.prefetch_related(
-            Prefetch(
-                'athleticorganisationmember_participant',
-                queryset=AthleticOrganisationMemberTable.objects.filter(
-                    status=OrganisationMemberStatus.Active,
-                ).select_related('athleticorganisation'),
-            ),
-        ).get(id = participantId)        
+        participantId = request.data.get('id')
+        if not participantId:
+            return Response({'detail': 'id is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        participantTable.title = request.data['title']
-        #participantTable.surname = request.data['surname']
-        #participantTable.firstname = request.data['firstname']
-        #participantTable.othernames = request.data['othernames']
-        #participantTable.initials = request.data['initials']
-        #participantTable.preferredname = request.data['preferredname']
-        #participantTable.homelanguage = request.data['homelanguage']
-        #participantTable.preferredlanguage = request.data['preferredlanguage']
-        #participantTable.maidenname = request.data['maidenname']
+        try:
+            participantTable = ParticipantTable.objects.prefetch_related(
+                Prefetch(
+                    'athleticorganisationmember_participant',
+                    queryset=AthleticOrganisationMemberTable.objects.filter(
+                        status=OrganisationMemberStatus.Active,
+                    ).select_related('athleticorganisation'),
+                ),
+            ).get(id=participantId)
+        except ParticipantTable.DoesNotExist:
+            logger.warning(
+                "Participant partial update failed: not found",
+                extra={"participant_id": participantId},
+            )
+            return Response({'detail': 'Participant not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        #participantTable.countryofissue = request.data['countryofissue']
-        #participantTable.typefld = request.data['typefld']
-        #participantTable.disabled = request.data['disabled']
-        #participantTable.gender = request.data['gender']
-        #participantTable.emailaddress = request.data['emailaddress']
-
-        #participantTable.usrphonenum = request.data['usrphonenum']
-        #participantTable.profilepic = request.data['profilepic']
-        #participantTable.user = request.data['user']
+        participantTable.title = request.data.get('title', participantTable.title)
    
         participantserializer = ParticipantSerializer(participantTable , data=request.data)
         if participantserializer.is_valid():
-            #participantserializer.save()
             return Response("In valid")       
-        else:
-            return Response(participantId)   
-
-        return Response(participantserializer.data)   
+        return Response(participantId)
 
 class eventViewSet(ModelViewSet):
     queryset = EventDetailTable.objects.all()
@@ -1061,20 +1249,29 @@ class participantPaymViewSet(ModelViewSet):
 
 
     def create(self , request  , *args, **kwargs):
+        payment_context = {
+            "participant_id": request.data.get("participant"),
+            "event_id": request.data.get("event"),
+            "subevent_id": request.data.get("subevent"),
+            "payment_status": request.data.get("payment_status"),
+        }
 
         try:
             participantTable = ParticipantTable.objects.get(id= request.data['participant'])   
         except ParticipantTable.DoesNotExist:
+            logger.warning("Payment create failed: participant not found", extra=payment_context)
             return Response("Participant not found", status=status.HTTP_404_NOT_FOUND)
         
         try:
             eventTable = EventDetailTable.objects.get(id= request.data['event'])   
         except EventDetailTable.DoesNotExist:
+            logger.warning("Payment create failed: event not found", extra=payment_context)
             return Response("Event not found", status=status.HTTP_404_NOT_FOUND)
         
         try:
             eventSubTable = EventSubDetailTable.objects.get(id= request.data['subevent'])   
         except EventSubDetailTable.DoesNotExist:
+            logger.warning("Payment create failed: subevent not found", extra=payment_context)
             return Response("Sub event not found", status=status.HTTP_404_NOT_FOUND)
 
         try:
@@ -1093,18 +1290,30 @@ class participantPaymViewSet(ModelViewSet):
                     payment_status = request.data['payment_status']
                 )    
 
+                participant_event_id = None
                 if request.data['payment_status'] == 'Completed':
                     participantEventTable = ParticipantEventTable.objects.create(
                         participant = participantTable,
                         event = eventTable,
                         subevent = eventSubTable,
                         paymref = participantPaymRefTable
-                    )  
+                    )
+                    participant_event_id = participantEventTable.id
             
                 participantpaymserializer = ParticipantPaymTableSerializer(participantPaymRefTable , many=False)
 
-        except Exception as e:
+        except Exception:
+            logger.exception("Payment reference creation failed", extra=payment_context)
             return Response("Error creating payment reference", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        logger.info(
+            "Payment reference created",
+            extra={
+                **payment_context,
+                "payment_ref_id": participantPaymRefTable.id,
+                "participant_event_id": participant_event_id,
+            },
+        )
 
         return  Response(participantpaymserializer.data , status=status.HTTP_201_CREATED)
 
@@ -1116,22 +1325,26 @@ class EventSubViewSet(ModelViewSet):
     parser_classes = (MultiPartParser , FormParser , JSONParser)
 
     def retrieve(self , request  , *args, **kwargs):
-        eventid = request.data['event']        
+        eventid = request.data.get('event')
+        if not eventid:
+            return Response({'detail': 'event is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        eventsubDetTable = EventSubDetailTable.objects.filter(event = eventid)    
-
+        eventsubDetTable = EventSubDetailTable.objects.filter(event=eventid)
         eventsubserializer = EventSubDetailSerializer(eventsubDetTable , many=True)
-        return  Response(eventsubserializer.data, status=status.HTTP_200_OK)
+        return Response(eventsubserializer.data, status=status.HTTP_200_OK)
     
     def list(self , request  , *args, **kwargs):
-        body_unicode = request.body.decode('utf-8')
-        body = json.loads(body_unicode)
-        eventid = body['event']        
+        body, error_response = _parse_body_or_400(request)
+        if error_response:
+            return error_response
 
-        eventsubDetTable = EventSubDetailTable.objects.filter(event = eventid)    
+        eventid = body.get('event')
+        if not eventid:
+            return Response({'detail': 'event is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        eventsubDetTable = EventSubDetailTable.objects.filter(event=eventid)
         eventsubserializer = EventSubDetailSerializer(eventsubDetTable , many=True)
-        return  Response(eventsubserializer.data, status=status.HTTP_200_OK)
+        return Response(eventsubserializer.data, status=status.HTTP_200_OK)
     
 @api_view(['GET'])
 def getSubeventsEvent(request , pk):
@@ -1145,6 +1358,21 @@ def getSubeventsEvent(request , pk):
 def getPayfastConnectionDetails(request):
 
     usesandbox = config('PAYFAST_USESANDBOX', cast=bool, default = True)
+    prefix = 'PAYFAST_SANDBOX_' if usesandbox else 'PAYFAST_'
+    env_keys = [
+        f'{prefix}MERCHANT_ID',
+        f'{prefix}MERCHANT_KEY',
+        f'{prefix}MERCHANT_PASSPHRASE',
+        f'{prefix}MERCHANT_ACTIVESCRIPT',
+        f'{prefix}MERCHANT_PAYMMETHODS',
+    ]
+    missing_keys = [key for key in env_keys if not os.getenv(key)]
+    if missing_keys:
+        logger.warning(
+            "PayFast configuration incomplete",
+            extra={"usesandbox": usesandbox, "missing_keys": missing_keys},
+        )
+
     merchantid = os.getenv('PAYFAST_SANDBOX_MERCHANT_ID') if usesandbox == True else os.getenv('PAYFAST_MERCHANT_ID')
     merchantkey = os.getenv('PAYFAST_SANDBOX_MERCHANT_KEY') if usesandbox == True else os.getenv('PAYFAST_MERCHANT_KEY')
     merchantpassphrase = os.getenv('PAYFAST_SANDBOX_MERCHANT_PASSPHRASE') if usesandbox == True else os.getenv('PAYFAST_MERCHANT_PASSPHRASE')  
@@ -1170,8 +1398,19 @@ class EventsDetailsView(APIView):
     parser_classes = (MultiPartParser , FormParser , JSONParser)
 
     def get(self, request):
-        event_id = request.data['event']
-        events = EventDetailTable.objects.prefetch_related("EventSubDetailTable_set").filter(id=event_id)   
+        body, error_response = _parse_body_or_400(request)
+        if error_response:
+            return error_response
+
+        event_id = body.get('event') or request.data.get('event')
+        if not event_id:
+            return Response({'detail': 'event is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        events = EventDetailTable.objects.prefetch_related("EventSubDetailTable_set").filter(id=event_id)
+        if not events.exists():
+            logger.warning("EventsDetailsView event not found", extra={"event_id": event_id})
+            return Response({'detail': 'Event not found.'}, status=status.HTTP_404_NOT_FOUND)
+
         serializer = EventDetailSerializer(events, many=True)
         return Response(serializer.data)
     
@@ -1181,9 +1420,43 @@ class NotifyUserView(APIView):
     def post(self, request):
         title = request.data.get("title", "Hello!")
         message = request.data.get("message", "You have a new alert.")
-        user_ids = [str(request.user.id)]
+        event_id = request.data.get("event_id")
+        notification_id = request.data.get("notification_id")
 
-        result = send_push_notification(title, message, user_ids)
+        if event_id is None or notification_id is None:
+            logger.warning("NotifyUserView missing event_id or notification_id")
+            return Response(
+                {'detail': 'event_id and notification_id are required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            result = send_push_notification(title, None, message, event_id, notification_id)
+        except Exception:
+            logger.exception(
+                "NotifyUserView push failed",
+                extra={"event_id": event_id, "notification_id": notification_id},
+            )
+            return Response(
+                {'detail': 'Push notification failed.'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        if isinstance(result, dict) and result.get('error'):
+            logger.error(
+                "NotifyUserView push returned error",
+                extra={
+                    "event_id": event_id,
+                    "notification_id": notification_id,
+                    "error": result.get('error'),
+                },
+            )
+            return Response(result, status=status.HTTP_502_BAD_GATEWAY)
+
+        logger.info(
+            "NotifyUserView push sent",
+            extra={"event_id": event_id, "notification_id": notification_id},
+        )
         return Response(result)
     
 
@@ -1193,79 +1466,20 @@ class EventNotificationViewSet(ModelViewSet):
     parser_classes = (MultiPartParser , FormParser , JSONParser)
 
     def retrieve(self , request  , *args, **kwargs):
-        body_unicode = request.body.decode('utf-8')
-        body = json.loads(body_unicode)
-
-        eventIdFound = False
-        eventid = None
-        try :
-            eventid = body['event']    
-            eventIdFound = True          
-        except KeyError:
-            eventIdFound = False 
-        except AttributeError:
-            eventIdFound = False 
-
-        notificationIdFound = False
-        notificationId = None
-        try :
-            notificationId = body['id']    
-            notificationIdFound = True            
-        except KeyError:
-            notificationIdFound = False 
-        except AttributeError:
-            notificationIdFound = False 
-        
-        
-        if eventIdFound :            
-            eventnotificationtTable = EventNotificationTable.objects.filter(event = eventid).order_by('-created')    
-            eventNotificationserializer = EventNotificationSerializer(eventnotificationtTable , many=True)
-        elif notificationIdFound :
-            eventnotificationtTable = EventNotificationTable.objects.filter(id = notificationId)    
-            eventNotificationserializer = EventNotificationSerializer(eventnotificationtTable , many=False)
-        else :
-            eventnotificationtTable = EventNotificationTable.objects.all().order_by('-created')    
-            eventNotificationserializer = EventNotificationSerializer(eventnotificationtTable , many=True)  
-            
-        return  Response(eventNotificationserializer.data, status=status.HTTP_200_OK)
+        return _filtered_viewset_response(
+            request,
+            EventNotificationTable.objects.all(),
+            EventNotificationSerializer,
+            ordering='-created',
+        )
     
     def list(self , request  , *args, **kwargs):
-
-        body_unicode = request.body.decode('utf-8')
-        body = json.loads(body_unicode)
-
-        eventIdFound = False
-        eventid = None
-        try :
-            eventid = body['event']    
-            eventIdFound = True          
-        except KeyError:
-            eventIdFound = False 
-        except AttributeError:
-            eventIdFound = False 
-
-        notificationIdFound = False
-        notificationId = None
-        try :
-            notificationId = body['id']    
-            notificationIdFound = True            
-        except KeyError:
-            notificationIdFound = False 
-        except AttributeError:
-            notificationIdFound = False 
-        
-        
-        if eventIdFound :            
-            eventnotificationtTable = EventNotificationTable.objects.filter(event = eventid).order_by('-created')    
-            eventNotificationserializer = EventNotificationSerializer(eventnotificationtTable , many=True)
-        elif notificationIdFound :
-            eventnotificationtTable = EventNotificationTable.objects.get(id = notificationId)    
-            eventNotificationserializer = EventNotificationSerializer(eventnotificationtTable , many=False)
-        else :
-            eventnotificationtTable = EventNotificationTable.objects.all().order_by('-created')    
-            eventNotificationserializer = EventNotificationSerializer(eventnotificationtTable , many=True)  
-
-        return  Response(eventNotificationserializer.data, status=status.HTTP_200_OK)
+        return _filtered_viewset_response(
+            request,
+            EventNotificationTable.objects.all(),
+            EventNotificationSerializer,
+            ordering='-created',
+        )
 
 
 def _organisation_notifications_from_body(body):
@@ -1290,13 +1504,17 @@ class OrganisationNotificationViewSet(ModelViewSet):
     parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def retrieve(self, request, *args, **kwargs):
-        body = _parse_request_body(request)
+        body, error_response = _parse_body_or_400(request)
+        if error_response:
+            return error_response
         notifications, many = _organisation_notifications_from_body(body)
         serializer = OrganisationNotificationSerializer(notifications, many=many)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def list(self, request, *args, **kwargs):
-        body = _parse_request_body(request)
+        body, error_response = _parse_body_or_400(request)
+        if error_response:
+            return error_response
         notifications, many = _organisation_notifications_from_body(body)
         serializer = OrganisationNotificationSerializer(notifications, many=many)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -1308,79 +1526,18 @@ class EventSponsorViewSet(ModelViewSet):
     parser_classes = (MultiPartParser , FormParser , JSONParser)
 
     def retrieve(self , request  , *args, **kwargs):
-        body_unicode = request.body.decode('utf-8')
-        body = json.loads(body_unicode)
-
-        eventIdFound = False
-        eventid = None
-        try :
-            eventid = body['event']    
-            eventIdFound = True          
-        except KeyError:
-            eventIdFound = False 
-        except AttributeError:
-            eventIdFound = False 
-
-        sponsorIdFound = False
-        sponsorId = None
-        try :
-            sponsorId = body['id']    
-            sponsorIdFound = True            
-        except KeyError:
-            sponsorIdFound = False 
-        except AttributeError:
-            sponsorIdFound = False 
-        
-        
-        if eventIdFound :            
-            eventsponsortTable = EventSponsorTable.objects.filter(event = eventid)    
-            eventSponsorserializer = EventSponsorSerializer(eventsponsortTable , many=True)
-        elif sponsorIdFound :
-            eventsponsortTable = EventSponsorTable.objects.get(id = sponsorId)    
-            eventSponsorserializer = EventSponsorSerializer(eventsponsortTable , many=False)
-        else :
-            eventsponsortTable = EventSponsorTable.objects.all()    
-            eventSponsorserializer = EventSponsorSerializer(eventsponsortTable , many=True)  
-            
-        return  Response(eventSponsorserializer.data, status=status.HTTP_200_OK)
+        return _filtered_viewset_response(
+            request,
+            EventSponsorTable.objects.all(),
+            EventSponsorSerializer,
+        )
     
     def list(self , request  , *args, **kwargs):
-
-        body_unicode = request.body.decode('utf-8')
-        body = json.loads(body_unicode)
-
-        eventIdFound = False
-        eventid = None
-        try :
-            eventid = body['event']    
-            eventIdFound = True          
-        except KeyError:
-            eventIdFound = False 
-        except AttributeError:
-            eventIdFound = False 
-
-        sponsorIdFound = False
-        sponsorId = None
-        try :
-            sponsorId = body['id']    
-            sponsorIdFound = True            
-        except KeyError:
-            sponsorIdFound = False 
-        except AttributeError:
-            sponsorIdFound = False 
-        
-        
-        if eventIdFound :            
-            eventsponsortTable = EventSponsorTable.objects.filter(event = eventid)    
-            eventSponsorserializer = EventSponsorSerializer(eventsponsortTable , many=True)
-        elif sponsorIdFound :
-            eventsponsortTable = EventSponsorTable.objects.get(id = sponsorId)    
-            eventSponsorserializer = EventSponsorSerializer(eventsponsortTable , many=False)
-        else :
-            eventsponsortTable = EventSponsorTable.objects.all()    
-            eventSponsorserializer = EventSponsorSerializer(eventsponsortTable , many=True)  
-
-        return  Response(eventSponsorserializer.data, status=status.HTTP_200_OK)
+        return _filtered_viewset_response(
+            request,
+            EventSponsorTable.objects.all(),
+            EventSponsorSerializer,
+        )
     
 class eventInfoViewSet(ModelViewSet):
     queryset = EventInformationTable.objects.all()
@@ -1388,79 +1545,18 @@ class eventInfoViewSet(ModelViewSet):
     parser_classes = (MultiPartParser , FormParser , JSONParser)
 
     def retrieve(self , request  , *args, **kwargs):
-        body_unicode = request.data.decode('utf-8')
-        body = json.loads(body_unicode)
-
-        eventIdFound = False
-        eventid = None
-        try :
-            eventid = body['event']    
-            eventIdFound = True          
-        except KeyError:
-            eventIdFound = False 
-        except AttributeError:
-            eventIdFound = False 
-
-        infoIdFound = False
-        infoId = None
-        try :
-            infoId = body['id']    
-            infoIdFound = True            
-        except KeyError:
-            infoIdFound = False 
-        except AttributeError:
-            infoIdFound = False 
-        
-        
-        if eventIdFound :            
-            eventInfoTable = EventInformationTable.objects.filter(event = eventid)    
-            eventInfoSerializer = EventInformationSerializer(eventInfoTable , many=True)
-        elif infoIdFound :
-            eventInfoTable = EventInformationTable.objects.get(id = infoId)    
-            eventInfoSerializer = EventInformationSerializer(eventInfoTable , many=False)
-        else :
-            eventInfoTable = EventInformationTable.objects.all()    
-            eventInfoSerializer = EventInformationSerializer(eventInfoTable , many=True)  
-            
-        return  Response(eventInfoSerializer.data, status=status.HTTP_200_OK)
+        return _filtered_viewset_response(
+            request,
+            EventInformationTable.objects.all(),
+            EventInformationSerializer,
+        )
     
     def list(self , request  , *args, **kwargs):
-
-        body_unicode = request.body.decode('utf-8')
-        body = json.loads(body_unicode) 
-
-        eventIdFound = False
-        eventid = None
-        try :
-            eventid = body['event']    
-            eventIdFound = True          
-        except KeyError:
-            eventIdFound = False 
-        except AttributeError:
-            eventIdFound = False 
-
-        infoIdFound = False
-        infoId = None
-        try :
-            infoId = body['id']    
-            infoIdFound = True            
-        except KeyError:
-            infoIdFound = False 
-        except AttributeError:
-            infoIdFound = False 
-        
-        
-        if eventIdFound :            
-            eventInfoTable = EventInformationTable.objects.filter(event = eventid)    
-            eventInfoSerializer = EventInformationSerializer(eventInfoTable , many=True)
-        elif infoIdFound :
-            eventInfoTable = EventInformationTable.objects.get(id = infoId)    
-            eventInfoSerializer = EventInformationSerializer(eventInfoTable , many=False)
-        else :
-            eventInfoTable = EventInformationTable.objects.all()    
-            eventInfoSerializer = EventInformationSerializer(eventInfoTable , many=True)  
-            
-        return  Response(eventInfoSerializer.data, status=status.HTTP_200_OK)
+        return _filtered_viewset_response(
+            request,
+            EventInformationTable.objects.all(),
+            EventInformationSerializer,
+        )
         
 class AppSponsorViewSet(ModelViewSet):
     queryset = AppSponsorTable.objects.all()
@@ -1468,79 +1564,20 @@ class AppSponsorViewSet(ModelViewSet):
     parser_classes = (MultiPartParser , FormParser , JSONParser)
 
     def retrieve(self , request  , *args, **kwargs):
-        body_unicode = request.body.decode('utf-8')
-        body = json.loads(body_unicode)
-
-        eventIdFound = False
-        eventid = None
-        try :
-            eventid = body['event']    
-            eventIdFound = True          
-        except KeyError:
-            eventIdFound = False 
-        except AttributeError:
-            eventIdFound = False 
-
-        sponsorIdFound = False
-        sponsorId = None
-        try :
-            sponsorId = body['id']    
-            sponsorIdFound = True            
-        except KeyError:
-            sponsorIdFound = False 
-        except AttributeError:
-            sponsorIdFound = False 
-        
-        
-        if eventIdFound :            
-            appSponsorTable = AppSponsorTable.objects.filter(event = eventid)    
-            appSponsorializer = AppSponsorSerializer(appSponsorTable , many=True)
-        elif sponsorIdFound :
-            appSponsorTable = AppSponsorTable.objects.filter(id = sponsorId)    
-            appSponsorializer = AppSponsorSerializer(appSponsorTable , many=False)
-        else :
-            appSponsorTable = AppSponsorTable.objects.all()    
-            appSponsorializer = AppSponsorSerializer(appSponsorTable , many=True)  
-            
-        return  Response(appSponsorializer.data, status=status.HTTP_200_OK)
+        return _filtered_viewset_response(
+            request,
+            AppSponsorTable.objects.all(),
+            AppSponsorSerializer,
+            event_field=None,
+        )
     
     def list(self , request  , *args, **kwargs):
-
-        body_unicode = request.body.decode('utf-8')
-        body = json.loads(body_unicode)
-
-        eventIdFound = False
-        eventid = None
-        try :
-            eventid = body['event']    
-            eventIdFound = True          
-        except KeyError:
-            eventIdFound = False 
-        except AttributeError:
-            eventIdFound = False 
-
-        sponsorIdFound = False
-        sponsorId = None
-        try :
-            sponsorId = body['id']    
-            sponsorIdFound = True            
-        except KeyError:
-            sponsorIdFound = False 
-        except AttributeError:
-            sponsorIdFound = False 
-        
-        
-        if eventIdFound :            
-            appSponsorTable = AppSponsorTable.objects.filter(event = eventid)    
-            appSponsorializer = AppSponsorSerializer(appSponsorTable , many=True)
-        elif sponsorIdFound :
-            appSponsorTable = AppSponsorTable.objects.get(id = sponsorId)    
-            appSponsorializer = AppSponsorSerializer(appSponsorTable , many=False)
-        else :
-            appSponsorTable = AppSponsorTable.objects.all()    
-            appSponsorializer = AppSponsorSerializer(appSponsorTable , many=True)  
-
-        return  Response(appSponsorializer.data, status=status.HTTP_200_OK)
+        return _filtered_viewset_response(
+            request,
+            AppSponsorTable.objects.all(),
+            AppSponsorSerializer,
+            event_field=None,
+        )
 
 
 class OrganisationViewSet(ModelViewSet):
@@ -1677,9 +1714,11 @@ def athleticOrganisationAddRoot(request):
         )
 
     if AthleticOrganisationTable.objects.filter(code=kwargs['code']).exists():
+        logger.info("Athletic organisation add root rejected: duplicate code", extra={"code": kwargs['code']})
         return Response({'error': 'An organisation with this code already exists.'}, status=status.HTTP_409_CONFLICT)
 
     organisation = AthleticOrganisationTable.add_root(**kwargs)
+    logger.info("Athletic organisation root created", extra={"organisation_id": organisation.id, "code": organisation.code})
     return Response(AthleticOrganisationSerializer(organisation).data, status=status.HTTP_201_CREATED)
 
 
@@ -1703,9 +1742,14 @@ def athleticOrganisationAddChild(request):
         )
 
     if AthleticOrganisationTable.objects.filter(code=kwargs['code']).exists():
+        logger.info("Athletic organisation add child rejected: duplicate code", extra={"code": kwargs['code']})
         return Response({'error': 'An organisation with this code already exists.'}, status=status.HTTP_409_CONFLICT)
 
     organisation = parent.add_child(**kwargs)
+    logger.info(
+        "Athletic organisation child created",
+        extra={"organisation_id": organisation.id, "parent_id": parent.id, "code": organisation.code},
+    )
     return Response(AthleticOrganisationSerializer(organisation).data, status=status.HTTP_201_CREATED)
 
 
@@ -1731,8 +1775,16 @@ def athleticOrganisationMove(request):
     try:
         organisation = _move_athletic_organisation(organisation, target_parent, position)
     except ValueError as exc:
+        logger.warning(
+            "Athletic organisation move rejected",
+            extra={"organisation_id": organisation_id, "error": str(exc)},
+        )
         return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
+    logger.info(
+        "Athletic organisation moved",
+        extra={"organisation_id": organisation.id, "target_parent_id": target_parent_id, "position": position},
+    )
     return Response(AthleticOrganisationSerializer(organisation).data, status=status.HTTP_200_OK)
 
 
@@ -1753,6 +1805,7 @@ def athleticOrganisationUpdateNode(request):
         organisation.code = body['code']
 
     organisation = _update_athletic_organisation_fields(organisation, body)
+    logger.info("Athletic organisation updated", extra={"organisation_id": organisation.id})
     return Response(AthleticOrganisationSerializer(organisation).data, status=status.HTTP_200_OK)
 
 
@@ -1768,6 +1821,7 @@ def athleticOrganisationDeleteNode(request):
         return Response({'error': 'Organisation not found.'}, status=status.HTTP_404_NOT_FOUND)
 
     organisation.delete()
+    logger.warning("Athletic organisation deleted", extra={"organisation_id": organisation_id})
     return Response({'detail': 'Organisation deleted.'}, status=status.HTTP_200_OK)
 
 
@@ -1842,7 +1896,10 @@ class AppReleaseVersionViewSet(ModelViewSet):
 
     @action(detail=False, methods=['post'], url_path='lookup')
     def lookup(self, request):
-        body = _parse_request_body(request)
+        body, error_response = _parse_body_or_400(request)
+        if error_response:
+            return error_response
+
         app_version = body.get('app_version')
         if not app_version:
             return Response(
@@ -1854,10 +1911,12 @@ class AppReleaseVersionViewSet(ModelViewSet):
             releaseVersionNumber=app_version,
         ).first()
         if release:
+            logger.debug("App release version lookup hit", extra={"app_version": app_version})
             return Response(
                 AppReleaseVersionSerializer(release).data,
                 status=status.HTTP_200_OK,
             )
+        logger.debug("App release version lookup miss", extra={"app_version": app_version})
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -1898,6 +1957,10 @@ def getParticipantTermsStatus(request):
 
     body = _parse_request_body(request)
     document_type = body.get('document_type', 'app')
+    logger.debug(
+        "Participant terms status requested",
+        extra={"participant_id": participant.id, "document_type": document_type},
+    )
     status_data = _build_participant_terms_status(participant, document_type)
     return Response(ParticipantTermsStatusSerializer(status_data).data)
 
@@ -1948,10 +2011,18 @@ def acceptParticipantTerms(request):
         },
     )
     if not created:
+        logger.debug(
+            "Participant terms already accepted",
+            extra={"participant_id": participant.id, "terms_id": terms.id},
+        )
         return Response(
             ParticipantTermsAcceptanceSerializer(acceptance).data,
             status=status.HTTP_200_OK,
         )
+    logger.info(
+        "Participant terms accepted",
+        extra={"participant_id": participant.id, "terms_id": terms.id, "document_type": document_type},
+    )
     return Response(
         ParticipantTermsAcceptanceSerializer(acceptance).data,
         status=status.HTTP_201_CREATED,
@@ -1963,6 +2034,18 @@ class ErrorViewSet(ModelViewSet):
     serializer_class = ErrorSerializer
     parser_classes = (MultiPartParser, FormParser, JSONParser)
     http_method_names = ['get', 'post', 'head', 'options']
+
+    def create(self, request, *args, **kwargs):
+        try:
+            response = super().create(request, *args, **kwargs)
+        except Exception:
+            logger.exception("Failed to save client error report")
+            raise
+        logger.info(
+            "Client error report received",
+            extra={"error_report_id": response.data.get('id')},
+        )
+        return response
 
 
 @api_view(['GET'])
@@ -1979,23 +2062,52 @@ class ParticipantImportView(APIView):
         excel_file = request.FILES.get("file")
 
         if excel_file is None:
+            logger.warning("Participant import rejected: no file uploaded")
             return Response(
                 {"message":"No file selected"},
                 status=400
             )
 
-        # Read Excel here using openpyxl or pandas
+        logger.info(
+            "Participant import started",
+            extra={"filename": excel_file.name, "size_bytes": excel_file.size},
+        )
 
-        workbook = load_workbook(excel_file)
-
-        worksheet = workbook["Entrants"]
+        try:
+            workbook = load_workbook(excel_file)
+            worksheet = workbook["Entrants"]
+        except KeyError:
+            logger.error(
+                "Participant import failed: worksheet 'Entrants' not found",
+                extra={"filename": excel_file.name},
+            )
+            return Response(
+                {"message": "Worksheet 'Entrants' not found in workbook."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception:
+            logger.exception(
+                "Participant import failed while reading workbook",
+                extra={"filename": excel_file.name},
+            )
+            return Response(
+                {"message": "Could not read Excel file."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         imported = 0
         importedParticipant = 0
         updatedParticipant = 0
         errors = []
 
-        usr = User.objects.get(username= 'Participant')        
+        try:
+            usr = User.objects.get(username='Participant')
+        except User.DoesNotExist:
+            logger.error("Participant import failed: import user 'Participant' not found")
+            return Response(
+                {"message": "Import user 'Participant' is not configured."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         #
         # Skip header row
@@ -2073,10 +2185,23 @@ class ParticipantImportView(APIView):
                         updatedParticipant += 1
 
             except Exception as ex:
-
-                errors.append(
-                    f"Row {row_number}: {str(ex)}"
+                error_message = f"Row {row_number}: {str(ex)}"
+                errors.append(error_message)
+                logger.warning(
+                    "Participant import row failed",
+                    extra={"row_number": row_number, "error": str(ex)},
                 )
+
+        logger.info(
+            "Participant import completed",
+            extra={
+                "filename": excel_file.name,
+                "imported": imported,
+                "participants_created": importedParticipant,
+                "participants_updated": updatedParticipant,
+                "error_count": len(errors),
+            },
+        )
 
         return Response({
             "imported": imported,

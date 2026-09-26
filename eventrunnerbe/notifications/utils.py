@@ -1,7 +1,38 @@
+import logging
+
 import requests
 from django.conf import settings
 
 from api.util import OrganisationNotificationAudience
+
+logger = logging.getLogger(__name__)
+
+
+def _log_onesignal_response(action, response, **context):
+    if response.status_code == 200:
+        logger.info(
+            "OneSignal %s succeeded",
+            action,
+            extra=context,
+        )
+        return
+
+    body = response.text[:500] if response.text else ""
+    logger.error(
+        "OneSignal %s failed status=%s body=%s",
+        action,
+        response.status_code,
+        body,
+        extra=context,
+    )
+
+
+def _onesignal_error_payload(response):
+    try:
+        return response.json()
+    except ValueError:
+        return {"raw_body": (response.text[:500] if response.text else "")}
+
 
 def send_push_notification(title , subtitle, message, event_id , notification_id, image_url = None):
     headers = {
@@ -28,20 +59,33 @@ def send_push_notification(title , subtitle, message, event_id , notification_id
         "ios_attachments": { "id": image_url if image_url else None, },
         "data": {
             "event_id": event_id , 
-            "notification_id" : notification_id
-            
+            "notification_id" : notification_id ,
+            "notification_type": "event"
         },
     }
 
-    response = requests.post(settings.ONESIGNAL_API_URL, json=payload, headers=headers)
+    try:
+        response = requests.post(settings.ONESIGNAL_API_URL, json=payload, headers=headers, timeout=30)
+    except requests.RequestException:
+        logger.exception(
+            "OneSignal event push request failed",
+            extra={"event_id": event_id, "notification_id": notification_id},
+        )
+        raise
+
+    _log_onesignal_response(
+        "event_push",
+        response,
+        event_id=event_id,
+        notification_id=notification_id,
+    )
 
     if response.status_code == 200:
         return response.json()
-    else:
-        return {
-            "error": response.status_code,
-            "details": response.json()
-        }
+    return {
+        "error": response.status_code,
+        "details": _onesignal_error_payload(response),
+    }
 
 
 def send_organisation_push_notification(
@@ -88,13 +132,33 @@ def send_organisation_push_notification(
     else:
         payload["included_segments"] = ["Total Subscriptions"]
 
-    response = requests.post(settings.ONESIGNAL_API_URL, json=payload, headers=headers)
+    try:
+        response = requests.post(settings.ONESIGNAL_API_URL, json=payload, headers=headers, timeout=30)
+    except requests.RequestException:
+        logger.exception(
+            "OneSignal organisation push request failed",
+            extra={
+                "athleticorganisation_id": athleticorganisation_id,
+                "notification_id": notification_id,
+                "event_id": event_id,
+            },
+        )
+        raise
+
+    _log_onesignal_response(
+        "organisation_push",
+        response,
+        athleticorganisation_id=athleticorganisation_id,
+        notification_id=notification_id,
+        event_id=event_id,
+        notification_audience=notification_audience,
+    )
 
     if response.status_code == 200:
         return response.json()
     return {
         "error": response.status_code,
-        "details": response.json(),
+        "details": _onesignal_error_payload(response),
     }
 
 
@@ -138,9 +202,13 @@ def create_user(external_id):
     }
     headers = {"Content-Type": "application/json"}
 
-    response = requests.post(url, json=payload, headers=headers)
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
+    except requests.RequestException:
+        logger.exception("OneSignal create_user request failed", extra={"external_id": external_id})
+        raise
 
-    print(response.text)
+    _log_onesignal_response("create_user", response, external_id=external_id)
 
 def create_user(title, message, user_ids=None, data=None):
     url = "https://api.onesignal.com/apps/{app_id}/users/by/{alias_label}/{alias_id}"
@@ -176,9 +244,13 @@ def create_user(title, message, user_ids=None, data=None):
         "Content-Type": "application/json"
     }
 
-    response = requests.patch(url, json=payload, headers=headers)
+    try:
+        response = requests.patch(url, json=payload, headers=headers, timeout=30)
+    except requests.RequestException:
+        logger.exception("OneSignal patch_user request failed")
+        raise
 
-    print(response.text)
+    _log_onesignal_response("patch_user", response)
 
 
 
@@ -198,9 +270,21 @@ def update_user(external_id , event_id):
         "Content-Type": "application/json"
     }
 
-    response = requests.patch(url, json=payload, headers=headers)
+    try:
+        response = requests.patch(url, json=payload, headers=headers, timeout=30)
+    except requests.RequestException:
+        logger.exception(
+            "OneSignal update_user_event_tag request failed",
+            extra={"external_id": external_id, "event_id": event_id},
+        )
+        raise
 
-    print(response.text)
+    _log_onesignal_response(
+        "update_user_event_tag",
+        response,
+        external_id=external_id,
+        event_id=event_id,
+    )
 
 
 def update_user_athletic_organisation(external_id, athleticorganisation_id, is_member=True):
@@ -219,9 +303,26 @@ def update_user_athletic_organisation(external_id, athleticorganisation_id, is_m
         "Content-Type": "application/json",
     }
 
-    response = requests.patch(url, json=payload, headers=headers)
+    try:
+        response = requests.patch(url, json=payload, headers=headers, timeout=30)
+    except requests.RequestException:
+        logger.exception(
+            "OneSignal update_user_athletic_organisation_tag request failed",
+            extra={
+                "external_id": external_id,
+                "athleticorganisation_id": athleticorganisation_id,
+                "is_member": is_member,
+            },
+        )
+        raise
 
-    print(response.text)
+    _log_onesignal_response(
+        "update_user_athletic_organisation_tag",
+        response,
+        external_id=external_id,
+        athleticorganisation_id=athleticorganisation_id,
+        is_member=is_member,
+    )
 
 
 def create_segment(event_id):
@@ -245,9 +346,13 @@ def create_segment(event_id):
         "Content-Type": "application/json; charset=utf-8"
     }
 
-    response = requests.post(url, json=payload, headers=headers)
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
+    except requests.RequestException:
+        logger.exception("OneSignal create_segment request failed", extra={"event_id": event_id})
+        raise
 
-    print(response.text)
+    _log_onesignal_response("create_segment", response, event_id=event_id)
 
 def update_segment(event_id):
 
@@ -268,6 +373,10 @@ def update_segment(event_id):
         "Content-Type": "application/json; charset=utf-8"
     }
 
-    response = requests.patch(url, json=payload, headers=headers)
+    try:
+        response = requests.patch(url, json=payload, headers=headers, timeout=30)
+    except requests.RequestException:
+        logger.exception("OneSignal update_segment request failed", extra={"event_id": event_id})
+        raise
 
-    print(response.text)
+    _log_onesignal_response("update_segment", response, event_id=event_id)

@@ -20,6 +20,10 @@ PAGE_BACKGROUNDS = {
     'administrator': 'Website_Background_Female_DB.png',
     'login': 'Website_Background_Male.png',
     'about': 'Website_Background_Male2_Coastal.png',
+    'delete_account': 'Website_Background_Male2_Coastal.png',
+    'public_policy': 'Website_Background_Male2_Coastal.png',
+    'public_policy_by_type': 'Website_Background_Male2_Coastal.png',
+    'public_policy_version': 'Website_Background_Male2_Coastal.png',
 }
 
 DEFAULT_BACKGROUND = 'Website_Background.png'

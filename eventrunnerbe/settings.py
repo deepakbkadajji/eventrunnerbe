@@ -61,6 +61,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     #'django.contrib.auth.middleware.RemoteUserMiddleware'
     'django.contrib.messages.middleware.MessageMiddleware',
+    'web.middleware.WebRequestLoggingMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -173,18 +174,18 @@ if not LOCAL_SERVE_STATIC_FILES:
     STATIC_DEFAULT_ACL = 'public-read'
     STATIC_LOCATION = 'static'
     STATIC_URL = f'{AWS_S3_ENDPOINT_URL}/{STATIC_LOCATION}/'
-    STATICFILES_STORAGE = 'eventrunnerbe.utilities.storage_backends.StaticStorage'
+    STATICFILES_STORAGE = 'utilities.storage_backends.StaticStorage'
 
 if not LOCAL_SERVE_MEDIA_FILES:
     PUBLIC_MEDIA_DEFAULT_ACL = 'public-read'
     PUBLIC_MEDIA_LOCATION = 'media/public'
 
     MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{PUBLIC_MEDIA_LOCATION}/'
-    DEFAULT_FILE_STORAGE = 'eventrunnerbe.utilities.storage_backends.PublicMediaStorage'
+    DEFAULT_FILE_STORAGE = 'utilities.storage_backends.PublicMediaStorage'
 
     PRIVATE_MEDIA_DEFAULT_ACL = 'private'
     PRIVATE_MEDIA_LOCATION = 'media/private'
-    PRIVATE_FILE_STORAGE = 'eventrunnerbe.utilities.storage_backends.PrivateMediaStorage'
+    PRIVATE_FILE_STORAGE = 'utilities.storage_backends.PrivateMediaStorage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -205,6 +206,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ),
+    'EXCEPTION_HANDLER': 'eventrunnerbe.exceptions.custom_exception_handler',
 }
 
 SIMPLE_JWT = {
@@ -269,3 +271,68 @@ SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', cast=bool, default=True)
 CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', cast=bool, default=True)    # HTTPS only
 
 SESSION_SAVE_EVERY_REQUEST = config('SESSION_SAVE_EVERY_REQUEST', cast=bool, default=True)
+
+LOG_LEVEL = config('LOG_LEVEL', default='DEBUG' if DEBUG else 'INFO')
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {name} {module} {message}',
+            'style': '{',
+        },
+        'json': {
+            '()': 'eventrunnerbe.log_formatters.JsonFormatter',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose' if DEBUG else 'json',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': LOG_LEVEL,
+    },
+    'loggers': {
+        'django': {
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'django.request': {
+            'level': 'WARNING',
+            'propagate': True,
+        },
+        'django.server': {
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'api': {
+            'level': LOG_LEVEL,
+            'propagate': False,
+            'handlers': ['console'],
+        },
+        'web': {
+            'level': LOG_LEVEL,
+            'propagate': False,
+            'handlers': ['console'],
+        },
+        'eventrunnerbe.notifications': {
+            'level': LOG_LEVEL,
+            'propagate': False,
+            'handlers': ['console'],
+        },
+        'eventrunnerbe': {
+            'level': LOG_LEVEL,
+            'propagate': False,
+            'handlers': ['console'],
+        },
+        'utilities': {
+            'level': LOG_LEVEL,
+            'propagate': False,
+            'handlers': ['console'],
+        },
+    },
+}
