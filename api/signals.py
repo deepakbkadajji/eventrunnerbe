@@ -5,11 +5,13 @@ from django.dispatch import receiver
 
 from .models import EventNotificationTable
 from .models import OrganisationNotificationTable
+from .models import AppNotificationTable
 from .models import ParticipantEventTable
 from .models import AthleticOrganisationMemberTable
 from .util import OrganisationMemberStatus
 from eventrunnerbe.notifications.utils import send_push_notification
 from eventrunnerbe.notifications.utils import send_organisation_push_notification
+from eventrunnerbe.notifications.utils import send_app_push_notification
 from eventrunnerbe.notifications.utils import update_user
 from eventrunnerbe.notifications.utils import update_user_athletic_organisation
 
@@ -64,6 +66,26 @@ def organisation_notification_handler(sender, instance, created, **kwargs):
         )
 
 
+@receiver(post_save, sender=AppNotificationTable)
+def app_notification_handler(sender, instance, created, **kwargs):
+    if not created:
+        return
+
+    try:
+        send_app_push_notification(
+            instance.title,
+            None,
+            instance.message,
+            instance.id,
+            instance.notificationImg.url if instance.notificationImg else None,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to send app push notification",
+            extra={"notification_id": instance.id},
+        )
+
+
 @receiver(post_save, sender=ParticipantEventTable)
 def participant_subscription_handler(sender, instance, created, **kwargs):
     if not created:
@@ -100,7 +122,7 @@ def athletic_organisation_member_save_handler(sender, instance, created, **kwarg
             extra={
                 "participant_id": instance.participant_id,
                 "athleticorganisation_id": instance.athleticorganisation_id,
-                "created": created,
+                "member_created": created,
             },
         )
 

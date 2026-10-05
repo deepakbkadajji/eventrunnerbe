@@ -31,6 +31,7 @@ from api.models import SubscriptionTable
 from api.models import AppReleaseVersionTable
 from api.models import TermsAndConditionsTable
 from api.models import OrganisationNotificationTable
+from api.models import AppNotificationTable
 from api.util import OrganisationMemberRole, OrganisationMemberStatus, OrganisationType
 from api.util import EventStatus, SponsorCategory, Gender
 from api.util import SubscriberType, BillingFrequency, SubscriptionStatus
@@ -180,6 +181,8 @@ def _administrator_section_for_action(action):
         "add_terms": "terms-and-conditions",
         "edit_terms": "terms-and-conditions",
         "delete_terms": "terms-and-conditions",
+        "add_app_notification": "general-notifications",
+        "delete_app_notification": "general-notifications",
     }
     return section_map.get(action, "event-categories")
 
@@ -478,6 +481,29 @@ def administrator(request):
                         "Cannot delete this version because participants have already accepted it.",
                     )
 
+        elif action == "add_app_notification":
+            title = request.POST.get("title", "").strip()
+            message = request.POST.get("message", "").strip()
+            if not title or not message:
+                messages.error(request, "Title and message are required.")
+            else:
+                AppNotificationTable.objects.create(
+                    title=title,
+                    message=message,
+                    notificationImg=request.FILES.get("notificationImg"),
+                )
+                messages.success(request, "General notification sent.")
+
+        elif action == "delete_app_notification":
+            notification = AppNotificationTable.objects.filter(
+                id=request.POST.get("notification_id"),
+            ).first()
+            if notification:
+                notification.delete()
+                messages.success(request, "General notification deleted.")
+            else:
+                messages.error(request, "Notification not found.")
+
         section = _administrator_section_for_action(action)
         return redirect(f"{reverse('administrator')}?section={section}")
 
@@ -487,6 +513,7 @@ def administrator(request):
         "subscriptions",
         "app-release-versions",
         "terms-and-conditions",
+        "general-notifications",
     }
     active_section = request.GET.get("section", "event-categories")
     if active_section not in valid_sections:
@@ -509,6 +536,7 @@ def administrator(request):
             "athletic_organisations": AthleticOrganisationTable.objects.all().order_by("name"),
             "app_release_versions": AppReleaseVersionTable.objects.all().order_by("-created"),
             "terms_and_conditions": TermsAndConditionsTable.objects.all().order_by("-created"),
+            "app_notifications": AppNotificationTable.objects.all().order_by("-created"),
         },
     )
 

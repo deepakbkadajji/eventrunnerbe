@@ -19,6 +19,7 @@ router.register('paymconfirminfo' , views.participantPaymViewSet)
 router.register('eventmodel' , views.eventViewSet , basename='eventmodel')
 router.register('eventnotifications' , views.EventNotificationViewSet)
 router.register('organisationnotifications', views.OrganisationNotificationViewSet)
+router.register('appnotifications', views.AppNotificationViewSet)
 router.register('eventsponsors' , views.EventSponsorViewSet)
 router.register('appsponsors' , views.AppSponsorViewSet)
 router.register('eventinformation' , views.eventInfoViewSet)
@@ -47,12 +48,35 @@ urlpatterns = [
     ),
     path(
         'termsandconditions/current/',
-        views.TermsAndConditionsViewSet.as_view({'get': 'current'}),
+        views.TermsAndConditionsViewSet.as_view({'get': 'current', 'post': 'current'}),
         name='terms-current',
     ),
     path('terms/current/', views.getCurrentTerms, name='terms-current-alias'),
     path('terms/status/', views.getParticipantTermsStatus, name='terms-status'),
     path('terms/accept/', views.acceptParticipantTerms, name='terms-accept'),
+    path(
+        'notification-reads/inbox/',
+        views.listParticipantNotificationInbox,
+        name='notification-read-inbox',
+    ),
+    path(
+        'notification-reads/event-unread/',
+        views.listUnreadEventNotifications,
+        name='notification-read-event-unread',
+    ),
+    path(
+        'notification-reads/event-notifications/',
+        views.listEventNotificationsForParticipant,
+        name='notification-read-event-notifications',
+    ),
+    path('notification-reads/mark/', views.markNotificationRead, name='notification-read-mark'),
+    path('notification-reads/list/', views.listNotificationReads, name='notification-read-list'),
+    path('notification-reads/status/', views.getNotificationReadStatus, name='notification-read-status'),
+    path(
+        'notification-reads/unread-count/',
+        views.getNotificationUnreadCount,
+        name='notification-read-unread-count',
+    ),
     path('', views.getRoutes , name='event-api-routes'),
     path('', include(router.urls) , name='event-api-eventimages'),
     path('events/', views.getEvents , name='event-api-events'),
@@ -60,6 +84,11 @@ urlpatterns = [
     path('events/cards/registered-upcoming/', views.getParticipantRegisteredUpcomingEventCards, name='event-api-cards-registered-upcoming'),
     path('events/cards/available-upcoming/', views.getParticipantAvailableUpcomingEventCards, name='event-api-cards-available-upcoming'),
     path('events/cards/completed-past/', views.getParticipantCompletedPastEventCards, name='event-api-cards-completed-past'),
+    path(
+        'events/club-completed/',
+        views.getClubCompletedClosedEvents,
+        name='event-api-club-completed-closed',
+    ),
     path('events/create/', views.createEvent , name='event-api-createevent'),
     path('events/<str:pk>/update/', views.updateEvent , name='event-api-updateevent'),
     path('events/<str:pk>/delete/', views.deleteEvent , name='event-api-deleteevent'),

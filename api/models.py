@@ -422,6 +422,27 @@ class OrganisationNotificationTable(models.Model):
     class Meta:
         ordering = ['-created']
 
+
+class AppNotificationTable(models.Model):
+    """General app-wide push notifications (not tied to an event or organisation)."""
+
+    title = models.CharField(max_length=50, null=True, blank=True)
+    message = models.CharField(max_length=255, null=True, blank=True)
+    notificationImg = models.ImageField(
+        upload_to='images/appNotificationImg/',
+        blank=True,
+        null=True,
+        storage=PrivateMediaStorage(),
+    )
+    created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title or f'App notification {self.id}'
+
+    class Meta:
+        ordering = ['-created']
+
+
 class EventSponsorTable(models.Model):
     event = models.ForeignKey(EventDetailTable, on_delete=models.CASCADE  , related_name='eventsponsor_event') 
     companyname = models.CharField(max_length=100 , null=True , blank=True)
@@ -567,6 +588,32 @@ class TermsAndConditionsTable(models.Model):
     class Meta:
         unique_together = ('document_type', 'version_number')
         ordering = ['-created']
+
+
+class ParticipantNotificationReadTable(models.Model):
+    """Tracks which participant has read event, organisation, or app notifications."""
+
+    participant = models.ForeignKey(
+        ParticipantTable,
+        on_delete=models.CASCADE,
+        related_name='notification_reads',
+    )
+    notification_kind = models.CharField(max_length=20)
+    notification_id = models.PositiveIntegerField()
+    read_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return (
+            f'{self.participant_id} read {self.notification_kind} '
+            f'notification {self.notification_id}'
+        )
+
+    class Meta:
+        unique_together = ('participant', 'notification_kind', 'notification_id')
+        ordering = ['-read_at']
+        indexes = [
+            models.Index(fields=['participant', 'notification_kind']),
+        ]
 
 
 class ParticipantTermsAcceptanceTable(models.Model):

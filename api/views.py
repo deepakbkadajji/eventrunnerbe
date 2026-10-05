@@ -28,8 +28,12 @@ from .models import EventImages
 
 from .serializers import EventNotificationSerializer
 from .serializers import OrganisationNotificationSerializer
+from .serializers import AppNotificationSerializer
+from .serializers import ParticipantNotificationReadSerializer
 from .models import EventNotificationTable
 from .models import OrganisationNotificationTable
+from .models import AppNotificationTable
+from .models import ParticipantNotificationReadTable
 
 from .serializers import EventSponsorSerializer
 from .models import EventSponsorTable
@@ -167,6 +171,7 @@ def _filtered_viewset_response(
     event_field='event',
     id_field='id',
     ordering=None,
+    notification_kind=None,
 ):
     body, error_response = _parse_body_or_400(request)
     if error_response:
@@ -178,7 +183,10 @@ def _filtered_viewset_response(
         id_field=id_field,
         ordering=ordering,
     )
-    serializer = serializer_class(records, many=many)
+    from api.notification_reads import serializer_context_with_read_status
+
+    context = serializer_context_with_read_status(body, notification_kind)
+    serializer = serializer_class(records, many=many, context=context)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -253,6 +261,15 @@ def _event_card_queryset():
         'athleticorganisation',
         'eventimage_event',
     )
+
+
+def _document_type_from_request(request, default='app'):
+    body = _parse_request_body(request)
+    document_type = body.get('document_type') or request.query_params.get('document_type') or default
+    if not isinstance(document_type, str):
+        return default
+    document_type = document_type.strip()
+    return document_type or default
 
 
 def _get_current_terms(document_type='app'):
@@ -554,6 +571,44 @@ def getParticipantCompletedPastEventCards(request):
         id__in=completed_event_ids,
     ).order_by('-eventdate')
 
+    return Response(EventCardSerializer(events, many=True).data)
+
+
+@api_view(['POST'])
+def getClubCompletedClosedEvents(request):
+    body, error_response = _parse_body_or_400(request)
+    if error_response:
+        return error_response
+
+    org_id = body.get('athleticorganisation') or body.get('athleticorganisation_id')
+    if org_id in (None, ''):
+        return Response(
+            {'detail': 'athleticorganisation is required in request body.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        org_id = int(org_id)
+    except (TypeError, ValueError):
+        return Response(
+            {'detail': 'athleticorganisation must be an integer.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not AthleticOrganisationTable.objects.filter(pk=org_id).exists():
+        return Response(
+            {'detail': 'Athletic organisation not found.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    events = _event_card_queryset().filter(
+        athleticorganisation_id=org_id,
+        eventstatus__in=[EventStatus.Completed, EventStatus.Closed],
+    ).order_by('-eventdate')
+
+    logger.info(
+        "Club completed/closed events requested",
+        extra={"athleticorganisation_id": org_id, "count": events.count()},
+    )
     return Response(EventCardSerializer(events, many=True).data)
 
 
@@ -1465,21 +1520,25 @@ class EventNotificationViewSet(ModelViewSet):
     serializer_class = EventNotificationSerializer
     parser_classes = (MultiPartParser , FormParser , JSONParser)
 
-    def retrieve(self , request  , *args, **kwargs):
-        return _filtered_viewset_response(
-            request,
-            EventNotificationTable.objects.all(),
-            EventNotificationSerializer,
-            ordering='-created',
-        )
+    #TODO: Add back in later
+    #def retrieve(self , request  , *args, **kwargs):
+    #    return _filtered_viewset_response(
+    #        request,
+    #        EventNotificationTable.objects.all(),
+    #        EventNotificationSerializer,
+    #        ordering='-created',
+    #        notification_kind='event',
+    #    )
     
-    def list(self , request  , *args, **kwargs):
-        return _filtered_viewset_response(
-            request,
-            EventNotificationTable.objects.all(),
-            EventNotificationSerializer,
-            ordering='-created',
-        )
+    #def list(self , request  , *args, **kwargs):
+    #    return _filtered_viewset_response(
+    #        request,
+    #        EventNotificationTable.objects.all(),
+    #        EventNotificationSerializer,
+    #        ordering='-created',
+    #        notification_kind='event',
+    #    )
+    
 
 
 def _organisation_notifications_from_body(body):
@@ -1495,6 +1554,30 @@ def _organisation_notifications_from_body(body):
     return queryset, True
 
 
+class AppNotificationViewSet(ModelViewSet):
+    queryset = AppNotificationTable.objects.all().order_by('-created')
+    serializer_class = AppNotificationSerializer
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
+
+    def retrieve(self, request, *args, **kwargs):
+        return _filtered_viewset_response(
+            request,
+            AppNotificationTable.objects.all(),
+            AppNotificationSerializer,
+            ordering='-created',
+            notification_kind='app',
+        )
+
+    def list(self, request, *args, **kwargs):
+        return _filtered_viewset_response(
+            request,
+            AppNotificationTable.objects.all(),
+            AppNotificationSerializer,
+            ordering='-created',
+            notification_kind='app',
+        )
+
+
 class OrganisationNotificationViewSet(ModelViewSet):
     queryset = OrganisationNotificationTable.objects.select_related(
         'athleticorganisation',
@@ -1508,7 +1591,10 @@ class OrganisationNotificationViewSet(ModelViewSet):
         if error_response:
             return error_response
         notifications, many = _organisation_notifications_from_body(body)
-        serializer = OrganisationNotificationSerializer(notifications, many=many)
+        from api.notification_reads import serializer_context_with_read_status
+
+        context = serializer_context_with_read_status(body, 'organisation')
+        serializer = OrganisationNotificationSerializer(notifications, many=many, context=context)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def list(self, request, *args, **kwargs):
@@ -1516,7 +1602,10 @@ class OrganisationNotificationViewSet(ModelViewSet):
         if error_response:
             return error_response
         notifications, many = _organisation_notifications_from_body(body)
-        serializer = OrganisationNotificationSerializer(notifications, many=many)
+        from api.notification_reads import serializer_context_with_read_status
+
+        context = serializer_context_with_read_status(body, 'organisation')
+        serializer = OrganisationNotificationSerializer(notifications, many=many, context=context)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
 
@@ -1925,9 +2014,9 @@ class TermsAndConditionsViewSet(ModelViewSet):
     serializer_class = TermsAndConditionsSerializer
     parser_classes = (MultiPartParser, FormParser, JSONParser)
 
-    @action(detail=False, methods=['get'], url_path='current')
+    @action(detail=False, methods=['get', 'post'], url_path='current')
     def current(self, request):
-        document_type = request.query_params.get('document_type', 'app')
+        document_type = _document_type_from_request(request)
         current_terms = _get_current_terms(document_type)
         if not current_terms:
             return Response(
@@ -1937,9 +2026,14 @@ class TermsAndConditionsViewSet(ModelViewSet):
         return Response(TermsAndConditionsSerializer(current_terms).data)
 
 
-@api_view(['GET'])
+@api_view(['GET', 'POST'])
 def getCurrentTerms(request):
-    document_type = request.GET.get('document_type', 'app')
+    body = _parse_request_body(request)
+    document_type = _document_type_from_request(request)
+    logger.info(
+        "Current terms requested",
+        extra={"document_type": document_type, "request_body": body},
+    )
     current_terms = _get_current_terms(document_type)
     if not current_terms:
         return Response(
@@ -1950,17 +2044,290 @@ def getCurrentTerms(request):
 
 
 @api_view(['POST'])
-def getParticipantTermsStatus(request):
+def markNotificationRead(request):
     participant, error_response = _get_participant_from_body(request)
     if error_response:
         return error_response
 
     body = _parse_request_body(request)
-    document_type = body.get('document_type', 'app')
-    logger.debug(
-        "Participant terms status requested",
-        extra={"participant_id": participant.id, "document_type": document_type},
+    from api.notification_reads import normalize_notification_kind
+    from api.notification_reads import notification_exists
+
+    notification_kind = normalize_notification_kind(
+        body.get('notification_kind') or body.get('notification_type'),
     )
+    notification_id = body.get('notification_id')
+    if not notification_kind:
+        return Response(
+            {'detail': 'notification_kind must be event, organisation, or app.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if notification_id in (None, ''):
+        return Response(
+            {'detail': 'notification_id is required.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        notification_id = int(notification_id)
+    except (TypeError, ValueError):
+        return Response(
+            {'detail': 'notification_id must be an integer.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if not notification_exists(notification_kind, notification_id):
+        return Response(
+            {'detail': 'Notification not found.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    read_record, created = ParticipantNotificationReadTable.objects.get_or_create(
+        participant=participant,
+        notification_kind=notification_kind,
+        notification_id=notification_id,
+    )
+    logger.info(
+        "Notification marked read",
+        extra={
+            "participant_id": participant.id,
+            "notification_kind": notification_kind,
+            "notification_id": notification_id,
+            "read_record_created": created,
+        },
+    )
+    return Response(
+        ParticipantNotificationReadSerializer(read_record).data,
+        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+    )
+
+
+@api_view(['POST'])
+def listNotificationReads(request):
+    participant, error_response = _get_participant_from_body(request)
+    if error_response:
+        return error_response
+
+    body = _parse_request_body(request)
+    from api.notification_reads import normalize_notification_kind
+
+    notification_kind = normalize_notification_kind(body.get('notification_kind'))
+    queryset = ParticipantNotificationReadTable.objects.filter(participant=participant)
+    if notification_kind:
+        queryset = queryset.filter(notification_kind=notification_kind)
+    elif body.get('notification_kind'):
+        return Response(
+            {'detail': 'notification_kind must be event, organisation, or app.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    return Response(
+        ParticipantNotificationReadSerializer(queryset.order_by('-read_at'), many=True).data,
+        status=status.HTTP_200_OK,
+    )
+
+
+def _event_unread_response(participant_id, event_id, unread_count):
+    return Response(
+        {
+            'participant_id': participant_id,
+            'event_id': event_id,
+            'unread_count': unread_count,
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+def _parse_participant_and_event_ids(body):
+    raw_participant_id = body.get('participantid') or body.get('participant_id')
+    raw_event_id = body.get('event') or body.get('event_id')
+
+    if raw_participant_id in (None, '') or raw_event_id in (None, ''):
+        return None, None
+
+    try:
+        return int(raw_participant_id), int(raw_event_id)
+    except (TypeError, ValueError):
+        return None, None
+
+
+@api_view(['POST'])
+def listUnreadEventNotifications(request):
+    body = _parse_request_body(request)
+    participant_id, event_id = _parse_participant_and_event_ids(body)
+
+    if participant_id is None or event_id is None:
+        return _event_unread_response(None, None, 0)
+
+    from api.notification_reads import unread_event_notification_count
+
+    unread_count = unread_event_notification_count(participant_id, event_id)
+    logger.info(
+        "Unread event notification count requested",
+        extra={
+            "participant_id": participant_id,
+            "event_id": event_id,
+            "unread_count": unread_count,
+        },
+    )
+    return _event_unread_response(participant_id, event_id, unread_count)
+
+
+@api_view(['POST'])
+def listEventNotificationsForParticipant(request):
+    body = _parse_request_body(request)
+    participant_id, event_id = _parse_participant_and_event_ids(body)
+
+    from api.notification_reads import event_notification_list_for_participant
+
+    if participant_id is None or event_id is None:
+        notifications = []
+    else:
+        notifications = event_notification_list_for_participant(participant_id, event_id)
+
+    logger.info(
+        "Event notification list for participant requested",
+        extra={
+            "participant_id": participant_id,
+            "event_id": event_id,
+            "count": len(notifications),
+        },
+    )
+    return Response(
+        {
+            'participant_id': participant_id,
+            'event_id': event_id,
+            'notifications': notifications,
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(['POST'])
+def listParticipantNotificationInbox(request):
+    participant, error_response = _get_participant_from_body(request)
+    if error_response:
+        return error_response
+
+    body = _parse_request_body(request)
+    from api.notification_reads import inbox_notifications_for_participant
+    from api.notification_reads import normalize_notification_kind
+
+    notification_kind = normalize_notification_kind(
+        body.get('notification_kind') or body.get('notification_type'),
+    )
+    if body.get('notification_kind') or body.get('notification_type'):
+        if not notification_kind:
+            return Response(
+                {'detail': 'notification_kind must be event, organisation, or app.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    notifications = inbox_notifications_for_participant(participant.id, notification_kind)
+    logger.info(
+        "Participant notification inbox requested",
+        extra={
+            "participant_id": participant.id,
+            "notification_kind": notification_kind,
+            "count": len(notifications),
+        },
+    )
+    return Response({'notifications': notifications}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+def getNotificationUnreadCount(request):
+    participant, error_response = _get_participant_from_body(request)
+    if error_response:
+        return error_response
+
+    from api.notification_reads import unread_counts_for_participant
+
+    total_unread, by_kind = unread_counts_for_participant(participant.id)
+    logger.info(
+        "Notification unread count requested",
+        extra={
+            "participant_id": participant.id,
+            "total_unread": total_unread,
+        },
+    )
+    return Response(
+        {
+            'total_unread': total_unread,
+            'by_kind': by_kind,
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(['POST'])
+def getNotificationReadStatus(request):
+    participant, error_response = _get_participant_from_body(request)
+    if error_response:
+        return error_response
+
+    body = _parse_request_body(request)
+    from api.notification_reads import normalize_notification_kind
+    from api.notification_reads import read_map_for_participant
+
+    items = body.get('notifications')
+    if items is None:
+        return Response(
+            {'detail': 'notifications list is required.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if not isinstance(items, list):
+        return Response(
+            {'detail': 'notifications must be a list.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    read_map = read_map_for_participant(participant.id)
+    results = []
+    for item in items:
+        if not isinstance(item, dict):
+            return Response(
+                {'detail': 'Each notification entry must be an object.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        notification_kind = normalize_notification_kind(
+            item.get('notification_kind') or item.get('notification_type'),
+        )
+        notification_id = item.get('notification_id')
+        if not notification_kind or notification_id in (None, ''):
+            return Response(
+                {'detail': 'Each notification requires notification_kind and notification_id.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            notification_id = int(notification_id)
+        except (TypeError, ValueError):
+            return Response(
+                {'detail': 'notification_id must be an integer.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        read_at = read_map.get((notification_kind, notification_id))
+        results.append({
+            'notification_kind': notification_kind,
+            'notification_id': notification_id,
+            'is_read': read_at is not None,
+            'read_at': read_at.isoformat() if read_at else None,
+        })
+
+    return Response({'results': results}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+def getParticipantTermsStatus(request):
+    body = _parse_request_body(request)
+    document_type = body.get('document_type', 'app')
+    logger.info(
+        "Participant terms status requested",
+        extra={"document_type": document_type, "request_body": body},
+    )
+
+    participant, error_response = _get_participant_from_body(request)
+    if error_response:
+        return error_response
+
     status_data = _build_participant_terms_status(participant, document_type)
     return Response(ParticipantTermsStatusSerializer(status_data).data)
 

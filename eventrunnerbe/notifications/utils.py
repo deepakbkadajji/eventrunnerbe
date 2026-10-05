@@ -162,6 +162,47 @@ def send_organisation_push_notification(
     }
 
 
+def send_app_push_notification(title, subtitle, message, notification_id, image_url=None):
+    headers = {
+        "Authorization": f"Basic {settings.ONESIGNAL_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "app_id": settings.ONESIGNAL_APP_ID,
+        "headings": {"en": title},
+        "contents": {"en": message},
+        "big_picture": image_url if image_url else None,
+        "ios_attachments": {"id": image_url if image_url else None},
+        "included_segments": ["Total Subscriptions"],
+        "data": {
+            "app_notification_id": notification_id,
+            "notification_type": "app",
+        },
+    }
+
+    try:
+        response = requests.post(settings.ONESIGNAL_API_URL, json=payload, headers=headers, timeout=30)
+    except requests.RequestException:
+        logger.exception(
+            "OneSignal app push request failed",
+            extra={"notification_id": notification_id},
+        )
+        raise
+
+    _log_onesignal_response(
+        "app_push",
+        response,
+        notification_id=notification_id,
+    )
+
+    if response.status_code == 200:
+        return response.json()
+    return {
+        "error": response.status_code,
+        "details": _onesignal_error_payload(response),
+    }
+
 
 def create_user(external_id):
 

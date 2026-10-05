@@ -20,6 +20,7 @@ Administrator
         <a href="?section=subscriptions" class="nav-link{% if active_section == 'subscriptions' %} active{% endif %}" data-section="subscriptions">Subscriptions</a>
         <a href="?section=app-release-versions" class="nav-link{% if active_section == 'app-release-versions' %} active{% endif %}" data-section="app-release-versions">App Release Versions</a>
         <a href="?section=terms-and-conditions" class="nav-link{% if active_section == 'terms-and-conditions' %} active{% endif %}" data-section="terms-and-conditions">Terms &amp; Conditions</a>
+        <a href="?section=general-notifications" class="nav-link{% if active_section == 'general-notifications' %} active{% endif %}" data-section="general-notifications">General Notifications</a>
     </aside>
 
     <main class="content">
@@ -539,6 +540,72 @@ Administrator
                     </table>
                     {% else %}
                     <p class="empty-message">No terms and conditions versions yet.</p>
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- General (app) notifications -->
+            <section id="section-general-notifications" class="admin-section{% if active_section == 'general-notifications' %} active{% endif %}">
+                <h2 class="page-heading">General Notifications</h2>
+                <p style="color: var(--muted); margin-bottom: 16px;">
+                    App-wide push notifications sent to all subscribers. Creating a notification here also triggers OneSignal.
+                </p>
+                <div class="card">
+                    <h3 class="section-title">Send Notification</h3>
+                    <form method="post" enctype="multipart/form-data" class="add-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="add_app_notification">
+                        <div class="form-group">
+                            <label>Title</label>
+                            <input type="text" name="title" required maxlength="50">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>Message</label>
+                            <textarea name="message" required maxlength="255" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Image</label>
+                            <input type="file" name="notificationImg" accept="image/*">
+                        </div>
+                        <button type="submit" class="btn-add">Send Notification</button>
+                    </form>
+
+                    {% if app_notifications %}
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Message</th>
+                                <th>Image</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for notification in app_notifications %}
+                        <tr>
+                            <td>{{ notification.title|default:"—" }}</td>
+                            <td>{{ notification.message|default:"—" }}</td>
+                            <td>
+                                {% if notification.notificationImg %}
+                                <img src="{{ notification.notificationImg.url }}" class="thumb" alt="{{ notification.title|default:'Notification' }}">
+                                {% else %}—{% endif %}
+                            </td>
+                            <td>{{ notification.created|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                <form method="post" style="display:inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="delete_app_notification">
+                                    <input type="hidden" name="notification_id" value="{{ notification.id }}">
+                                    <button type="submit" class="btn-remove" onclick="return confirm('Delete this notification record?');">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="empty-message">No general notifications yet.</p>
                     {% endif %}
                 </div>
             </section>

@@ -8,6 +8,8 @@ from .models import EventImages
 from .models import EventSubDetailTable
 from .models import EventNotificationTable
 from .models import OrganisationNotificationTable
+from .models import AppNotificationTable
+from .models import ParticipantNotificationReadTable
 from .models import EventSponsorTable
 from .models import EventInformationTable
 from .models import OrganisationTable
@@ -58,7 +60,33 @@ class ParticipantRegisteredSubeventSerializer(EventSubDetailSerializer):
         registered_ids = self.context.get('registered_subevent_ids', set())
         return obj.id in registered_ids
 
-class EventNotificationSerializer(serializers.ModelSerializer):
+class NotificationReadStatusSerializerMixin:
+    is_read = serializers.SerializerMethodField()
+    read_at = serializers.SerializerMethodField()
+
+    def _notification_read_key(self, obj):
+        kind = self.context.get('notification_kind')
+        if not kind:
+            return None
+        return (kind, obj.id)
+
+    def get_is_read(self, obj):
+        key = self._notification_read_key(obj)
+        if key is None:
+            return False
+        return key in self.context.get('notification_read_map', {})
+
+    def get_read_at(self, obj):
+        key = self._notification_read_key(obj)
+        if key is None:
+            return None
+        read_at = self.context.get('notification_read_map', {}).get(key)
+        if read_at is None:
+            return None
+        return read_at.isoformat()
+
+
+class EventNotificationSerializer(NotificationReadStatusSerializerMixin, serializers.ModelSerializer):
 
     event_name = serializers.ReadOnlyField(source='event.eventname')
 
@@ -66,11 +94,14 @@ class EventNotificationSerializer(serializers.ModelSerializer):
         model = EventNotificationTable
         fields = [
             'id', 'event', 'title', 'message', 'notificationImg', 'notificationPdf',
-            'event_name', 'created',
+            'event_name', 'created', #'is_read', 'read_at',
         ]
-        read_only_fields = ['created']
+        read_only_fields = ['created' ]  #,'is_read', 'read_at']]
 
-class OrganisationNotificationSerializer(serializers.ModelSerializer):
+class OrganisationNotificationSerializer(
+    NotificationReadStatusSerializerMixin,
+    serializers.ModelSerializer,
+):
     athleticorganisation_name = serializers.ReadOnlyField(source='athleticorganisation.name')
     event_name = serializers.ReadOnlyField(source='event.eventname')
     notification_audience_label = serializers.CharField(
@@ -92,8 +123,33 @@ class OrganisationNotificationSerializer(serializers.ModelSerializer):
             'notification_audience',
             'notification_audience_label',
             'created',
+            'is_read',
+            'read_at',
         ]
-        read_only_fields = ['created']
+        read_only_fields = ['created', 'is_read', 'read_at']
+
+
+class AppNotificationSerializer(NotificationReadStatusSerializerMixin, serializers.ModelSerializer):
+    class Meta:
+        model = AppNotificationTable
+        fields = [
+            'id', 'title', 'message', 'notificationImg', 'created', 'is_read', 'read_at',
+        ]
+        read_only_fields = ['created', 'is_read', 'read_at']
+
+
+class ParticipantNotificationReadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ParticipantNotificationReadTable
+        fields = [
+            'id',
+            'participant',
+            'notification_kind',
+            'notification_id',
+            'read_at',
+        ]
+        read_only_fields = ['read_at']
+
 
 class EventSponsorSerializer(serializers.ModelSerializer):
     event_name = serializers.ReadOnlyField(source='event.eventname')
@@ -132,7 +188,7 @@ class EventDetailSerializer(serializers.ModelSerializer):
     #subeventsvar = EventSubDetailSerializer(source = 'EventSubDetailTable_set' , many=True , read_only=True )
     subevents = EventSubDetailSerializer(source = 'subevent_event' , many=True , read_only=True )
     eventimage = EventImageSerializer(source = 'eventimage_event' , many=False , read_only=True )
-    eventnotifications = serializers.SerializerMethodField()
+    #eventnotifications = serializers.SerializerMethodField()
     eventsponsors = EventSponsorSerializer(source = 'eventsponsor_event' , many=True , read_only=True )
     organisation_name = serializers.ReadOnlyField(source='organisation.name')
     athleticorganisation_name = serializers.ReadOnlyField(source='athleticorganisation.name')
@@ -164,7 +220,9 @@ class EventDetailSerializer(serializers.ModelSerializer):
             'athleticorganisation', 'athleticorganisation_name', 'athleticscategory',
             'athleticscategory_name', 'venuename', 'sanctionstatus', 'sanctionreference',
             'registrationopendate', 'registrationclosedate', 'maximumparticipants', 'isactive',
-            'subevents', 'eventimage', 'eventnotifications', 'eventsponsors',
+            'subevents', 'eventimage', 
+            #'eventnotifications', 
+            'eventsponsors',
         ]
 
 
